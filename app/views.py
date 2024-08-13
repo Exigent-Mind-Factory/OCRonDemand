@@ -11,6 +11,7 @@ from celery import group
 from celery.result import GroupResult
 import shutil
 import aiofiles
+from aiofiles import os as async_os
 # from sanic.response import stream
 
 views_bp = Blueprint('views')
@@ -317,45 +318,20 @@ async def download_file(request, file_id):
         if not os.path.exists(file_path):
             return response.json({'error': 'OCRed file not found on server'}, status=404)
 
-        # Serve the file for download
+        # Get file statistics for the Content-Length header
+        file_stat = await async_os.stat(file_path)
         headers = {
-            'Content-Disposition': f'attachment; filename="{ocr_filename}"'
+            'Content-Disposition': f'attachment; filename="{ocr_filename}"',
+            'Content-Type': 'application/pdf',
+            'Content-Length': str(file_stat.st_size),
         }
 
-        return await response.file(file_path, filename=ocr_filename, mime_type='application/pdf', headers=headers)
-
-
-# @views_bp.route('/download/<file_id:int>', methods=['GET'])
-# async def download_file(request, file_id):
-    # with session_scope() as session:
-        # file_entry = session.query(File).filter_by(id=file_id).first()
-        # if not file_entry:
-            # return response.json({'error': 'File not found'}, status=404)
-
-        # Construct the OCR'ed filename
-        # original_filename = file_entry.file_name
-        # base_name, ext = os.path.splitext(original_filename)
-        # ocr_filename = f"{base_name}_OCRed{ext}"
-        # file_path = os.path.join(os.path.dirname(file_entry.file_path), ocr_filename)
-
-        # if not os.path.exists(file_path):
-            # return response.json({'error': 'OCRed file not found on server'}, status=404)
-
-        # Serve the file for download in chunks
-        # headers = {
-            # 'Content-Disposition': f'attachment; filename="{ocr_filename}"',
-            # 'Content-Type': 'application/pdf',
-        # }
-
-        # async def file_stream(response):
-            # async with aiofiles.open(file_path, 'rb') as f:
-                # chunk = await f.read(8192)  # Read in 8KB chunks
-                # while chunk:
-                    # await response.write(chunk)
-                    # chunk = await f.read(8192)
-
-        # return stream(file_stream, headers=headers)
-
+        # Stream the file to the user
+        return await response.file_stream(
+            file_path,
+            chunk_size=8192,  # You can adjust the chunk size if needed
+            headers=headers,
+        )
 
 
 @views_bp.route('/logout', methods=['POST'])
