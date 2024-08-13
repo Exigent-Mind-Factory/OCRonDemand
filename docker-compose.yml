@@ -1,0 +1,59 @@
+services:
+  web:
+    build: .
+    command: ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- ./wait-for-it.sh redis:6379 --timeout=60 --strict -- python run.py
+    volumes:
+      - .:/app
+    ports:
+      - "8777:8777"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - PYTHONPATH=${PYTHONPATH}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - morocrondemand_network
+
+  celery:
+    build: .
+    command: ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- ./wait-for-it.sh redis:6379 --timeout=60 --strict -- celery -A app.tasks worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - PYTHONPATH=${PYTHONPATH}
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY}  # Pass concurrency setting to the Celery worker
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - morocrondemand_network
+
+  redis:
+    image: redis:alpine
+    networks:
+      - morocrondemand_network
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - morocrondemand_network
+
+volumes:
+  postgres_data:
+
+networks:
+  morocrondemand_network:
+    driver: bridge

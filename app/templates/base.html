@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MorOCRonDemand - Morae Global</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <style>
+        body {
+            background-image: url("/static/images/ocr_background.png");
+            background-size: cover; /* Ensures the image covers the entire page */
+            background-position: center; /* Centers the image */
+            background-repeat: no-repeat; /* Prevents the image from repeating */
+            background-attachment: fixed; /* Keeps the background fixed on scroll */
+            font-family: Arial, sans-serif;
+            color: #FF3C00; /* Sets the text color to #FF3C00 */
+        }
+        .navbar {
+            background-color: #004080;
+        }
+        .navbar-brand img {
+            max-height: 50px; /* Adjust the height of the logo */
+        }
+        .footer {
+            background-color: #004080;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+        h1, h2, h3, h4, h5, h6, p, a, span, div, label, button {
+            color: #FF3C00; /* Apply #FF3C00 to all text-related elements */
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="/static/images/ocrondemand.png" alt="MorOCRonDemand Logo">
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2024 Morae Global. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

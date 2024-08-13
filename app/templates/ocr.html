@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="text-center">
+        <h1>OCR Upload for Project: {{ project_name }}</h1>
+        <p class="lead">Upload your documents below to start the OCR process.</p>
+    </div>
+
+    <!-- Section for Single PDF Upload -->
+    <div class="row mt-5">
+        <div class="col-md-6">
+            <h2>Single PDF Upload OCR</h2>
+            <p>
+                Upload individual PDF files to have them processed through our advanced OCR engine.
+                Quick results and easy downloads.
+            </p>
+            <form id="single-upload-form" enctype="multipart/form-data">
+                <input type="hidden" id="project_id" name="project_id" value="{{ project_id }}">
+                <input type="hidden" id="client_id" name="client_id" value="{{ client_id }}">
+                
+                <div class="mb-3">
+                    <label for="single_file" class="form-label">Choose PDF file</label>
+                    <input type="file" class="form-control" id="single_file" name="file" accept="application/pdf" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Upload Single PDF</button>
+            </form>
+            <!-- Progress bar -->
+            <div class="progress mt-3" style="height: 20px; display: none;" id="upload-progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+            </div>
+        </div>
+
+        <!-- Section for Bulk PDF Folder Upload -->
+        <div class="col-md-6" id="bulk-upload-section">
+            <h2>Bulk PDF Folder Upload OCR</h2>
+            <p>
+                Upload an entire folder of PDF files for batch OCR processing. Efficient and secure.
+            </p>
+            <form id="bulk-upload-form" enctype="multipart/form-data">
+                <input type="hidden" id="bulk_project_id" name="project_id" value="{{ project_id }}">
+                <input type="hidden" id="bulk_client_id" name="client_id" value="{{ client_id }}">
+
+                <div class="mb-3">
+                    <label for="bulk_files" class="form-label">Choose PDF files</label>
+                    <input type="file" class="form-control" id="bulk_files" name="files" accept="application/pdf" multiple required>
+                </div>
+                <button type="submit" class="btn btn-success w-100">Upload PDF Folder</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Section for Security Information -->
+    <div class="row mt-5">
+        <div class="col-md-12">
+            <h2>Data Security You Can Trust</h2>
+            <p>
+                At Morae Global, your data security is our priority. All documents are processed in a secure
+                environment with state-of-the-art encryption. Your data remains confidential and protected.
+            </p>
+            <p>
+                MorOCRonDemand complies with the latest security standards, ensuring peace of mind for your document workflows.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('single-upload-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const fileInput = document.getElementById('single_file');
+        const file = fileInput.files[0];
+        const project_id = document.getElementById('project_id').value;
+        const client_id = document.getElementById('client_id').value;
+        const chunkSize = 5 * 1024 * 1024; // 5MB per chunk
+        const totalChunks = Math.ceil(file.size / chunkSize);
+        const progressBar = document.getElementById('progress-bar');
+        const uploadProgress = document.getElementById('upload-progress');
+
+        // Hide the file input immediately
+        fileInput.disabled = true;
+
+        // Show progress bar
+        uploadProgress.style.display = 'block';
+
+        // Perform chunked upload
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, file.size);
+            const chunk = file.slice(start, end);
+
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('chunk_index', i);
+            formData.append('total_chunks', totalChunks);
+            formData.append('file_name', file.name);
+            formData.append('project_id', project_id);
+            formData.append('client_id', client_id);
+
+            try {
+                const response = await fetch('/upload_single_pdf_chunked', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error(`Error: ${errorData.error}`);
+                    alert(`Error: ${errorData.error}`);
+                    return;
+                }
+
+                const progressPercentage = Math.floor(((i + 1) / totalChunks) * 100);
+                progressBar.style.width = `${progressPercentage}%`;
+                progressBar.textContent = `${progressPercentage}%`;
+
+            } catch (error) {
+                console.error('Upload failed:', error);
+                alert('An error occurred while uploading the file. Please try again.');
+                return;
+            }
+        }
+
+        alert('File uploaded successfully');
+        window.location.href = '/';  // Redirect to home.html where OCR processing happens
+    });
+
+    // Add the alert message for any interaction with the Bulk PDF Folder Upload section
+    document.getElementById('bulk-upload-section').addEventListener('click', function(event) {
+        event.preventDefault(); // Prevent any default action
+        alert('Feature yet to be Launched');
+    });
+</script>
+
+{% endblock %}

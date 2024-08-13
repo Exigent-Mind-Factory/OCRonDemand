@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="text-center">
+        <h1>Welcome to MorOCRonDemand</h1>
+        <p class="lead">Morae Global's cutting-edge OCR solution for all your document processing needs.</p>
+        <!-- Logout Button -->
+        <form id="logout-form" action="/logout" method="POST" class="mt-3">
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </form>
+    </div>
+
+    <!-- Section for Creating a Project -->
+    <div class="row mt-5">
+        <div class="col-md-12">
+            <h2>Create a New Project</h2>
+            <form id="create-project-form" class="mt-4">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="client_name" class="form-label">Client Name</label>
+                        <select id="client_name" class="form-select">
+                            <option value="">Select Client</option>
+                            <!-- Populate with existing clients -->
+                        </select>
+                        <input type="text" id="new_client_name" class="form-control mt-2" placeholder="Add New Client Name">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="project_name" class="form-label">Project Name</label>
+                        <select id="project_name" class="form-select">
+                            <option value="">Select Project</option>
+                            <!-- Populate with existing projects -->
+                        </select>
+                        <input type="text" id="new_project_name" class="form-control mt-2" placeholder="Add New Project Name">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Create Project</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid" style="margin-top: 20px;">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>My Projects</h2>
+            <input class="form-control mb-3" id="search-input" type="text" placeholder="Search...">
+            <div class="d-flex justify-content-between mb-2">
+                <div>
+                    Show 
+                    <select id="items-per-page">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select> 
+                    entries
+                </div>
+                <button class="btn btn-danger" id="delete-selected" onclick="deleteSelected()">Delete Selected</button>
+            </div>
+            <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                <table class="table table-bordered" id="projects-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all"></th>
+                            <th onclick="sortTable(1)">Client Name</th>
+                            <th onclick="sortTable(2)">Project Name</th>
+                            <th onclick="sortTable(3)">File Name</th>
+                            <th onclick="sortTable(4)">Date Uploaded</th>
+                            <th onclick="sortTable(5)">Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="projects-list">
+                        <!-- Populate with user's projects and files -->
+                    </tbody>
+                </table>
+                <ul class="pagination" id="pagination-controls"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPage = 1;
+    let itemsPerPage = 10;
+    let allRows = [];
+
+    document.getElementById('items-per-page').addEventListener('change', function () {
+        itemsPerPage = parseInt(this.value);
+        paginateTable();
+    });
+
+    document.getElementById('select-all').addEventListener('click', function () {
+        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
+        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
+    });
+
+    function deleteSelected() {
+        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]:checked');
+        checkboxes.forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            row.remove(); // Remove the row from the DOM
+        });
+        // Recalculate pagination and display the updated rows
+        allRows = document.querySelectorAll('#projects-list tr');
+        paginateTable();
+    }
+
+    function sortTable(n) {
+        let table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+        table = document.getElementById("projects-table");
+        switching = true;
+        dir = "asc"; 
+        while (switching) {
+            switching = false;
+            rows = table.rows;
+            for (i = 1; i < (rows.length - 1); i++) {
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("TD")[n];
+                y = rows[i + 1].getElementsByTagName("TD")[n];
+                if (dir === "asc") {
+                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else if (dir === "desc") {
+                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                switchcount++;
+            } else {
+                if (switchcount === 0 && dir === "asc") {
+                    dir = "desc";
+                    switching = true;
+                }
+            }
+        }
+    }
+
+    function paginateTable() {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const paginatedItems = Array.from(allRows).slice(start, end);
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        paginatedItems.forEach(row => projectsList.appendChild(row));
+        updatePaginationControls();
+    }
+
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(allRows.length / itemsPerPage);
+        const paginationControls = document.getElementById('pagination-controls');
+        paginationControls.innerHTML = '';
+
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item' + (i === currentPage ? ' active' : '');
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', function (event) {
+                event.preventDefault();
+                currentPage = i;
+                paginateTable();
+            });
+            paginationControls.appendChild(li);
+        }
+    }
+
+    document.getElementById('create-project-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        let clientName = document.getElementById('client_name').value.trim();
+        let newClientName = document.getElementById('new_client_name').value.trim();
+        let projectName = document.getElementById('project_name').value.trim();
+        let newProjectName = document.getElementById('new_project_name').value.trim();
+
+        // Use the dropdown values if they exist, otherwise use the input field values
+        if (!clientName && !newClientName) {
+            alert('Please select a client from the dropdown or enter a new client name.');
+            return;
+        }
+
+        if (!projectName && !newProjectName) {
+            alert('Please select a project from the dropdown or enter a new project name.');
+            return;
+        }
+
+        if (newClientName) {
+            clientName = newClientName;
+        }
+
+        if (newProjectName) {
+            projectName = newProjectName;
+        }
+
+        const formData = {
+            client_name: clientName,
+            project_name: projectName
+        };
+
+        try {
+            const response = await fetch('/create_project', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert('Project created successfully');
+                window.location.href = `/ocr/${data.project_id}`; // Redirect to ocr.html for the project
+            } else {
+                const errorData = await response.json();
+                alert(`Error: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('Error creating project:', error);
+            alert('An unexpected error occurred. Please try again.');
+        }
+    });
+
+    async function loadProjects() {
+        const response = await fetch('/my_projects');
+        const projects = await response.json();
+
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        allRows = []; // Reset allRows on reload
+
+        // Sort projects by the most recent file upload date
+        projects.forEach(project => {
+            project.files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            project.files.forEach(file => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="checkbox"></td>
+                    <td>${project.client_name}</td>
+                    <td>${project.name}</td>
+                    <td>${file.name}</td>
+                    <td>${new Date(file.created_at).toLocaleString()}</td>
+                    <td id="status-${file.id}">${file.status}</td>
+                    <td id="action-${file.id}">
+                        ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` : ''}
+                        ${file.status === 'Not processed' ? `<button onclick="startOCR(${file.id})" class="btn btn-warning btn-sm">Start OCR</button>` : ''}
+                        ${file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
+                                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                                        </div>` : ''}
+                        ${file.status === 'Failed' ? `<button onclick="checkError(${file.id})" class="btn btn-danger btn-sm">Show Error</button>` : ''}
+                    </td>
+                `;
+                allRows.push(row);
+            });
+        });
+
+        // Ensure the latest files are displayed at the top
+        allRows.sort((a, b) => new Date(b.cells[4].innerText) - new Date(a.cells[4].innerText));
+
+        paginateTable();
+
+        document.getElementById('search-input').addEventListener('keyup', function() {
+            const value = this.value.toLowerCase();
+            const rows = document.getElementById('projects-list').getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const rowText = row.textContent || row.innerText;
+                row.style.display = rowText.toLowerCase().indexOf(value) > -1 ? '' : 'none';
+            }
+        });
+    }
+
+    async function pollStatusUpdates() {
+        const response = await fetch('/my_projects');
+        const projects = await response.json();
+
+        projects.forEach(project => {
+            project.files.forEach(file => {
+                const statusElement = document.getElementById(`status-${file.id}`);
+                const actionElement = document.getElementById(`action-${file.id}`);
+                if (statusElement && actionElement) {
+                    statusElement.innerText = file.status;
+                    actionElement.innerHTML = file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` :
+                                              file.status === 'Not processed' ? `<button onclick="startOCR(${file.id})" class="btn btn-warning btn-sm">Start OCR</button>` :
+                                              file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
+                                                                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                                                            </div>` :
+                                              file.status === 'Failed' ? `<button onclick="checkError(${file.id})" class="btn btn-danger btn-sm">Show Error</button>` : '';
+                }
+            });
+        });
+    }
+
+    function startPolling() {
+        // Poll every 10 seconds (10000 ms)
+        setInterval(pollStatusUpdates, 10000);
+    }
+
+    async function loadDropdowns() {
+        const response = await fetch('/my_projects');
+        const projects = await response.json();
+    
+        const clientDropdown = document.getElementById('client_name');
+        const projectDropdown = document.getElementById('project_name');
+        clientDropdown.innerHTML = '<option value="">Select Client</option>';
+        projectDropdown.innerHTML = '<option value="">Select Project</option>';
+    
+        const clients = new Set();
+        const projectsSet = new Set();
+    
+        projects.forEach(project => {
+            clients.add(project.client_name);
+            if (!projectsSet.has(project.name)) { // Ensure unique project names
+                projectsSet.add(project.name);
+                const projectOption = document.createElement('option');
+                projectOption.value = project.name;
+                projectOption.text = project.name;
+                projectDropdown.appendChild(projectOption);
+            }
+        });
+    
+        clients.forEach(client => {
+            const clientOption = document.createElement('option');
+            clientOption.value = client;
+            clientOption.text = client;
+            clientDropdown.appendChild(clientOption);
+        });
+    }
+
+    loadProjects();
+    loadDropdowns();
+    startPolling(); // Start polling for status updates
+
+    async function startOCR(fileId) {
+        const response = await fetch(`/start_ocr/${fileId}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            alert('OCR started successfully');
+            loadProjects();
+        } else {
+            const errorData = await response.json();
+            alert(`Error: ${errorData.error}`);
+        }
+    }
+
+    async function checkError(fileId) {
+        const response = await fetch(`/check_error/${fileId}`);
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+    }
+</script>
+{% endblock %}

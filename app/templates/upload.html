@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="text-center">Upload PDF for OCR</h2>
+        <form action="/upload" method="POST" enctype="multipart/form-data" class="mt-4">
+            <div class="mb-3">
+                <label for="file" class="form-label">Select PDF File</label>
+                <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Upload File</button>
+        </form>
+
+        <hr class="my-4">
+
+        <h2 class="text-center">Upload Folder of PDFs</h2>
+        <form action="/upload_folder" method="POST" enctype="multipart/form-data" class="mt-4">
+            <div class="mb-3">
+                <label for="files" class="form-label">Select Folder</label>
+                <input type="file" class="form-control" id="files" name="files" webkitdirectory multiple required>
+            </div>
+            <button type="submit" class="btn btn-success w-100">Upload Folder</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
