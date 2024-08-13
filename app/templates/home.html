@@ -60,20 +60,20 @@
                 <button class="btn btn-danger" id="delete-selected" onclick="deleteSelected()">Delete Selected</button>
             </div>
             <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
-                <table class="table table-bordered" id="projects-table">
+                <table class="table table-bordered fold-table" id="projects-table">
                     <thead>
                         <tr>
                             <th><input type="checkbox" id="select-all"></th>
-                            <th onclick="sortTable(1)">Client Name</th>
-                            <th onclick="sortTable(2)">Project Name</th>
-                            <th onclick="sortTable(3)">File Name</th>
-                            <th onclick="sortTable(4)">Date Uploaded</th>
-                            <th onclick="sortTable(5)">Status</th>
+                            <th>Client Name</th>
+                            <th>Project Name</th>
+                            <th>File Name</th>
+                            <th>Date Uploaded</th>
+                            <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="projects-list">
-                        <!-- Populate with user's projects and files -->
+                        <!-- Populate with grouped projects -->
                     </tbody>
                 </table>
                 <ul class="pagination" id="pagination-controls"></ul>
@@ -236,15 +236,37 @@
         projectsList.innerHTML = '';
         allRows = []; // Reset allRows on reload
 
-        // Sort projects by the most recent file upload date
+        // Group projects by client name and project name
+        const groupedProjects = {};
         projects.forEach(project => {
-            project.files.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            project.files.forEach(file => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
+            const key = `${project.client_name}::${project.name}`;
+            if (!groupedProjects[key]) {
+                groupedProjects[key] = [];
+            }
+            groupedProjects[key].push(...project.files);
+        });
+
+        for (const [key, files] of Object.entries(groupedProjects)) {
+            const [clientName, projectName] = key.split('::');
+
+            // Main row (collapsible)
+            const mainRow = document.createElement('tr');
+            mainRow.classList.add('view');
+            mainRow.innerHTML = `
+                <td><input type="checkbox"></td>
+                <td colspan="6"><strong>${clientName} - ${projectName}</strong> (${files.length} files)</td>
+            `;
+            allRows.push(mainRow);
+
+            // Files rows (initially hidden)
+            files.forEach(file => {
+                const fileRow = document.createElement('tr');
+                fileRow.classList.add('fold-content');
+                fileRow.style.display = 'none';  // Ensure rows are initially hidden
+                fileRow.innerHTML = `
                     <td><input type="checkbox"></td>
-                    <td>${project.client_name}</td>
-                    <td>${project.name}</td>
+                    <td>${clientName}</td>
+                    <td>${projectName}</td>
                     <td>${file.name}</td>
                     <td>${new Date(file.created_at).toLocaleString()}</td>
                     <td id="status-${file.id}">${file.status}</td>
@@ -257,12 +279,9 @@
                         ${file.status === 'Failed' ? `<button onclick="checkError(${file.id})" class="btn btn-danger btn-sm">Show Error</button>` : ''}
                     </td>
                 `;
-                allRows.push(row);
+                allRows.push(fileRow);
             });
-        });
-
-        // Ensure the latest files are displayed at the top
-        allRows.sort((a, b) => new Date(b.cells[4].innerText) - new Date(a.cells[4].innerText));
+        }
 
         paginateTable();
 
@@ -357,5 +376,22 @@
         const errorData = await response.json();
         alert(`Error: ${errorData.error}`);
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const table = document.querySelector('.fold-table');
+        table.addEventListener('click', function(event) {
+            const viewRow = event.target.closest('.view');
+            if (viewRow) {
+                let nextRow = viewRow.nextElementSibling;  // Change const to let
+                while (nextRow && nextRow.classList.contains('fold-content')) {
+                    nextRow.style.display = nextRow.style.display === 'none' ? 'table-row' : 'none';
+                    nextRow = nextRow.nextElementSibling;
+                }
+            }
+        });
+    });
+    
+
+
 </script>
 {% endblock %}
