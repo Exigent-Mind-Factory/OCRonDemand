@@ -1,0 +1,16 @@
+sanic==23.3.0
+sanic-jinja2==2022.11.11  # Updated to the latest version found in the error log
+sqlalchemy==2.0.16
+psycopg2-binary==2.9.6
+werkzeug==2.3.6
+celery==5.3.0
+redis==5.0.0
+ocrmypdf==14.0.1
+PyPDF2==3.0.1
+python-dotenv==1.0.0
+alembic
+sanic-session
+pycryptodome
+pikepdf==8.15.1
+sanic-wtf
+aiofiles
