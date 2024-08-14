@@ -16,7 +16,7 @@ services:
       - redis
       - postgres
     networks:
-      - morocrondemand_network
+      - ocrondemand_network
 
   celery:
     build: .
@@ -33,12 +33,12 @@ services:
       - redis
       - postgres
     networks:
-      - morocrondemand_network
+      - ocrondemand_network
 
   redis:
     image: redis:alpine
     networks:
-      - morocrondemand_network
+      - ocrondemand_network
 
   postgres:
     image: postgres:13
@@ -49,11 +49,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - morocrondemand_network
+      - ocrondemand_network
 
 volumes:
   postgres_data:
 
 networks:
-  morocrondemand_network:
+  ocrondemand_network:
     driver: bridge
