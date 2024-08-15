@@ -2,13 +2,20 @@
 
 {% block content %}
 <div class="container mt-5">
+    
     <div class="text-center">
         <h1>Welcome to MorOCRonDemand</h1>
         <p class="lead">Morae Global's cutting-edge OCR solution for all your document processing needs.</p>
+       <!-- Authentication Button -->
+       {% if is_authenticated %}
         <!-- Logout Button -->
         <form id="logout-form" action="/logout" method="POST" class="mt-3">
             <button type="submit" class="btn btn-danger">Logout</button>
         </form>
+        {% else %}
+        <!-- Login Button -->
+        <a href="/login" class="btn btn-primary mt-3">Login</a>
+        {% endif %}
     </div>
 
     <!-- Section for Creating a Project -->
