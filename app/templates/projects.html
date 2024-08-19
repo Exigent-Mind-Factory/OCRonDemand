@@ -1,109 +1,88 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="home-page">
-    <div class="hero-section">
-        <div class="container">
-            <!-- <div class="nav-button-container">
-                <form id="logout-form" action="/logout" method="POST">
-                    <button type="submit" class="btn btn-secondary nav-button">Logout</button>
-                </form>
-            </div> -->
-            <div class="text-left">
-                <h1>Welcome to <br> OCR On Demand</h1>
-                <p class="lead">Morae Global's cutting-edge OCR solution for all your document processing needs.</p>
-                <a href="/projects" class="btn btn-primary button-primary">View Projects</a>
-                <!-- Logout Button -->
-                <!-- <form id="logout-form" action="/logout" method="POST" class="mt-3">
-                    <button type="submit" class="btn btn-danger button-secondary">Logout</button>
-                </form> -->
-            </div>
-        
-            <!-- Section for Creating a Project -->
-            <!-- <div class="row mt-5">
-                <div class="col-md-12">
-                    <h2>Create a New Project</h2>
-                    <form id="create-project-form" class="mt-4">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="client_name" class="form-label">Client Name</label>
-                                <select id="client_name" class="form-select">
-                                    <option value="">Select Client</option>
-                                </select>
-                                <input type="text" id="new_client_name" class="form-control mt-2" placeholder="Add New Client Name">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="project_name" class="form-label">Project Name</label>
-                                <select id="project_name" class="form-select">
-                                    <option value="">Select Project</option>
-                                </select>
-                                <input type="text" id="new_project_name" class="form-control mt-2" placeholder="Add New Project Name">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 button-primary">Create Project</button>
-                    </form>
-                </div>
-            </div> -->
-        </div>
-    </div>
-
-    <div class="data-privacy-section">
-        <div class="container">
-            <div class="flex-container">
-                <div class="text-left">
-                    <h2>Data Security You Can Trust</h2>
-                    <p>
-                        At Morae Global, your data security is our priority. All documents are processed in a secure
-                        environment with state-of-the-art encryption. Your data remains confidential and protected.
-                    </p>
-                    <p>
-                        <strong>OCR On Demand</strong> complies with the latest security standards, ensuring peace of mind for your document workflows.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- <div class="container container-fluid" style="margin-top: 20px;">
-        <div class="row">
-            <div class="col-md-12">
-                <h2>My Projects</h2>
-                <input class="form-control mb-3" id="search-input" type="text" placeholder="Search...">
-                <div class="d-flex justify-content-between mb-2">
-                    <div>
-                        Show
-                        <select id="items-per-page">
-                            <option value="10">10</option>
-                            <option value="20">20</option>
-                            <option value="30">30</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                        entries
-                    </div>
-                    <button class="btn btn-danger button-secondary" id="delete-selected" onclick="deleteSelected()">Delete Selected</button>
-                </div>
-                <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
-                    <table class="table table-bordered fold-table" id="projects-table">
-                        <thead>
-                            <tr>
-                                <th><input type="checkbox" id="select-all"></th>
-                                <th>Client Name</th>
-                                <th>Project Name</th>
-                                <th>File Name</th>
-                                <th>Date Uploaded</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="projects-list">
-                        </tbody>
-                    </table>
-                    <ul class="pagination" id="pagination-controls"></ul>
-                </div>
-            </div>
-        </div>
-    </div> -->
+<div class="projects-page">
+  <div class="container mt-5">
+      <!-- <div class="nav-button-container">
+          <form id="logout-form" action="/logout" method="POST">
+              <button type="submit" class="btn btn-secondary nav-button">Logout</button>
+          </form>
+      </div> -->
+      <!-- <div class="text-center">
+          <h1>Welcome to MorOCRonDemand</h1>
+          <p class="lead">Morae Global's cutting-edge OCR solution for all your document processing needs.</p>
+      </div> -->
+  
+      <!-- Section for Creating a Project -->
+      <div class="row mt-5">
+          <div class="col-md-12">
+              <h2>Create a New Project</h2>
+              <form id="create-project-form" class="mt-4">
+                  <div class="row">
+                      <div class="col-md-6 mb-3">
+                          <label for="client_name" class="form-label">Client Name</label>
+                          <select id="client_name" class="form-select">
+                              <option value="">Select Client</option>
+                              <!-- Populate with existing clients -->
+                          </select>
+                          <input type="text" id="new_client_name" class="form-control mt-2" placeholder="Add New Client Name">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                          <label for="project_name" class="form-label">Project Name</label>
+                          <select id="project_name" class="form-select">
+                              <option value="">Select Project</option>
+                              <!-- Populate with existing projects -->
+                          </select>
+                          <input type="text" id="new_project_name" class="form-control mt-2" placeholder="Add New Project Name">
+                      </div>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100 button-primary">Create Project</button>
+              </form>
+          </div>
+      </div>
+  </div>
+  
+  <div class="container container-fluid" style="margin-top: 20px;">
+      <div class="row">
+          <div class="col-md-12">
+              <h2>My Projects</h2>
+              <input class="form-control mb-3" id="search-input" type="text" placeholder="Search...">
+              <div class="d-flex justify-content-between mb-2">
+                  <div>
+                      Show
+                      <select id="items-per-page">
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="30">30</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                      </select>
+                      entries
+                  </div>
+                  <button class="btn btn-danger button-secondary" id="delete-selected" onclick="deleteSelected()">Delete Selected</button>
+              </div>
+              <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                  <table class="table table-bordered fold-table" id="projects-table">
+                      <thead>
+                          <tr>
+                              <th><input type="checkbox" id="select-all"></th>
+                              <th>Client Name</th>
+                              <th>Project Name</th>
+                              <th>File Name</th>
+                              <th>Date Uploaded</th>
+                              <th>Status</th>
+                              <th>Action</th>
+                          </tr>
+                      </thead>
+                      <tbody id="projects-list">
+                          <!-- Populate with grouped projects -->
+                      </tbody>
+                  </table>
+                  <ul class="pagination" id="pagination-controls"></ul>
+              </div>
+          </div>
+      </div>
+  </div>
 </div>
 
 <script>
