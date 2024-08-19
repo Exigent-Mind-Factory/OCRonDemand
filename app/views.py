@@ -24,10 +24,24 @@ def get_user_from_request(request):
             return user
     return None
 
+# @views_bp.route('/', methods=['GET'])
+# async def home(request):
+    # user = get_user_from_request(request)
+    # return request.app.ctx.jinja.render('home.html', request, user=user)
+
 @views_bp.route('/', methods=['GET'])
 async def home(request):
     user = get_user_from_request(request)
-    return request.app.ctx.jinja.render('home.html', request, user=user)
+    is_authenticated = user is not None
+    return request.app.ctx.jinja.render('home.html', request, user=user, is_authenticated=is_authenticated)
+
+
+@views_bp.route('/projects', methods=['GET'])
+async def projects(request):
+    user = get_user_from_request(request)
+    is_authenticated = user is not None
+    return request.app.ctx.jinja.render('projects.html', request, user=user, is_authenticated=is_authenticated)
+
 
 @views_bp.route('/signup', methods=['GET'])
 async def show_signup_form(request):
