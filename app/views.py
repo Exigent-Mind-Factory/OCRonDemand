@@ -33,7 +33,7 @@ def get_user_from_request(request):
 async def home(request):
     user = get_user_from_request(request)
     is_authenticated = user is not None
-    return request.app.ctx.jinja.render('home.html', request, user=user, is_authenticated=is_authenticated)
+    return request.app.ctx.jinja.render('base.html', request, user=user, is_authenticated=is_authenticated)
 
 
 @views_bp.route('/projects', methods=['GET'])
