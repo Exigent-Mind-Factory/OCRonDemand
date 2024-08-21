@@ -16,6 +16,7 @@ from aiofiles import os as async_os
 from app.models import Project, File, Document
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
+from sqlalchemy import func  # Import func for case-insensitive comparison
 # from sanic.response import stream
 
 views_bp = Blueprint('views')
@@ -270,6 +271,20 @@ async def get_projects(request, client_id):
         projects = session.query(Project).filter_by(client_id=client_id).all()
         project_list = [{"id": project.id, "name": project.name} for project in projects]
         return response.json(project_list)
+
+
+@views_bp.route('/get_projects_by_client_name/<client_name>', methods=['GET'])
+async def get_projects_by_client_name(request, client_name):
+    with session_scope() as session:
+        # Use case-insensitive comparison for client name
+        client = session.query(Client).filter(func.lower(Client.name) == func.lower(client_name)).first()
+        
+        if client:
+            projects = session.query(Project).filter_by(client_id=client.id).all()
+            project_list = [{"id": project.id, "name": project.name} for project in projects]
+            return response.json(project_list)
+        
+        return response.json([])  # Return an empty list if no matching client found
 
 
 @views_bp.route('/start_ocr/<file_id>', methods=['POST'])

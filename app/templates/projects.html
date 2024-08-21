@@ -46,13 +46,11 @@
                       </select>
                       entries
                   </div>
-                  <button class="btn btn-danger button-secondary" id="delete-selected" onclick="deleteSelected()">Delete Selected</button>
               </div>
               <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
-                  <table class="table table-bordered fold-table" id="projects-table">
+                  <table class="table table-bordered" id="projects-table">
                       <thead>
                           <tr>
-                              <th><input type="checkbox" id="select-all"></th>
                               <th onclick="sortTable(1)">Client Name</th>
                               <th onclick="sortTable(2)">Project Name</th>
                               <th onclick="sortTable(3)">File Name</th>
@@ -79,16 +77,23 @@
     let currentSortColumn = null;
     let currentSortDirection = 'asc';
 
+    // Function to update "Show entries" functionality
+    document.getElementById('items-per-page').addEventListener('change', function () {
+        itemsPerPage = parseInt(this.value);
+        currentPage = 1;  // Reset to page 1 when changing items per page
+        paginateTable();
+    });
+
     // Add search functionality
-    document.getElementById('search-input').addEventListener('input', function() {
+    document.getElementById('search-input').addEventListener('input', function () {
         const searchValue = this.value.toLowerCase();
         allRows.forEach(row => {
             const textContent = Array.from(row.querySelectorAll('td'))
                 .map(td => td.textContent.toLowerCase())
-                .join(' ');  // Combine the content of all <td> elements in the row
+                .join(' ');
             row.style.display = textContent.includes(searchValue) ? 'table-row' : 'none';
         });
-        paginateTable();  // Re-paginate the table after filtering
+        paginateTable();  // Re-paginate after filtering
     });
 
     // Fetch and populate Client Name dropdown
@@ -97,52 +102,47 @@
             const response = await fetch('/get_clients');
             const clients = await response.json();
             const clientSelect = document.getElementById('client_name');
-    
+
             // Clear existing options
             clientSelect.innerHTML = '<option value="">Select Client</option>';
-    
-            // Populate the dropdown with clients
+
+            // Populate the dropdown with client names instead of IDs
             clients.forEach(client => {
                 const option = document.createElement('option');
-                option.value = client.id;
+                option.value = client.name;
                 option.textContent = client.name;
                 clientSelect.appendChild(option);
             });
-    
+
             console.log('Client dropdown populated.');
         } catch (error) {
             console.error('Error fetching clients:', error);
         }
     }
-    
 
-    // Fetch and populate Project Name dropdown based on selected client
-    async function populateProjects(clientId) {
-        if (!clientId) {
+
+    // Fetch and populate Project Name dropdown based on selected client name
+    async function populateProjects(clientName) {
+        if (!clientName) {
             document.getElementById('project_name').innerHTML = '<option value="">Select Project</option>';
             return;
         }
     
         try {
-            const response = await fetch(`/get_projects/${clientId}`);
-            const projects = await response.json();
-            const projectSelect = document.getElementById('project_name');
+            // Encode the client name for use in the URL
+            const encodedClientName = encodeURIComponent(clientName);
     
-            // Clear existing options to avoid duplicates
+            const response = await fetch(`/get_projects_by_client_name/${encodedClientName}`);
+            const projects = await response.json();
+            
+            const projectSelect = document.getElementById('project_name');
             projectSelect.innerHTML = '<option value="">Select Project</option>';
     
-            // Create a Set to store unique project names
-            const projectNamesSet = new Set();
-    
-            // Populate the dropdown with unique projects
             projects.forEach(project => {
-                if (!projectNamesSet.has(project.name)) {
-                    projectNamesSet.add(project.name);  // Add to Set to ensure uniqueness
-                    const option = document.createElement('option');
-                    option.value = project.id;
-                    option.textContent = project.name;
-                    projectSelect.appendChild(option);
-                }
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                projectSelect.appendChild(option);
             });
     
             console.log('Project dropdown populated with unique projects.');
@@ -151,23 +151,23 @@
         }
     }
 
-    
 
     // Event listener for Client dropdown change to load corresponding projects
     document.getElementById('client_name').addEventListener('change', function () {
-        const clientId = this.value;
-        populateProjects(clientId);
+        const clientName = this.value;  // Get the client name directly from the dropdown
+        populateProjects(clientName);  // Fetch and populate the corresponding projects
     });
-    
-    // Call the function to populate clients on page load
+
+    // Populate clients on page load
     populateClients();
 
 
-    // Debug: Create Project button submission handler
+
+    // populateClients();  // Populate clients on page load
+
+    // Event listener for Create Project form submission
     document.getElementById('create-project-form').addEventListener('submit', async function(event) {
         event.preventDefault();
-        console.log('Create Project button clicked.');
-
         let clientName = document.getElementById('client_name').value.trim();
         let newClientName = document.getElementById('new_client_name').value.trim();
         let projectName = document.getElementById('project_name').value.trim();
@@ -175,13 +175,11 @@
 
         if (!clientName && !newClientName) {
             alert('Please select a client from the dropdown or enter a new client name.');
-            console.log('Client name missing.');
             return;
         }
 
         if (!projectName && !newProjectName) {
             alert('Please select a project from the dropdown or enter a new project name.');
-            console.log('Project name missing.');
             return;
         }
 
@@ -189,7 +187,6 @@
         if (newProjectName) projectName = newProjectName;
 
         const formData = { client_name: clientName, project_name: projectName };
-        console.log('Form data prepared:', formData);
 
         try {
             const response = await fetch('/create_project', {
@@ -200,23 +197,19 @@
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Project created successfully:', data);
                 alert('Project created successfully');
-                window.location.href = `/ocr/${data.project_id}`; // Redirect to OCR page
+                window.location.href = `/ocr/${data.project_id}`;  // Redirect to OCR page
             } else {
                 const errorData = await response.json();
-                console.log('Error creating project:', errorData);
                 alert(`Error: ${errorData.error}`);
             }
         } catch (error) {
-            console.error('Error creating project:', error);
             alert('An unexpected error occurred. Please try again.');
         }
     });
 
-    // Debug: Event listener for Start OCR button click
+    // Start OCR functionality
     async function handleStartOCR(fileId) {
-        console.log('Start OCR button clicked for file ID:', fileId);
         try {
             const response = await fetch(`/start_ocr/${fileId}`, {
                 method: 'POST'
@@ -226,208 +219,91 @@
                 const statusElement = document.getElementById(`status-${fileId}`);
                 const actionElement = document.getElementById(`action-${fileId}`);
 
-                if (statusElement && actionElement) {
-                    statusElement.innerText = 'Processing';
-                    actionElement.innerHTML = `
-                        <div class="progress mt-3" style="height: 20px;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
-                        </div>
-                    `;
-                }
-
-                console.log('OCR processing started for file ID:', fileId);
-                alert('OCR processing started for the file.');
+                statusElement.innerText = 'Processing';
+                actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
+                                               <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                           </div>`;
             } else {
-                console.error('Failed to start OCR for file ID:', fileId);
                 alert('Error: Unable to start OCR.');
             }
         } catch (error) {
-            console.error('Error starting OCR:', error);
             alert('An unexpected error occurred. Please try again.');
         }
     }
 
-    // Function to attach event listeners to Start OCR buttons
     function attachButtonListeners() {
         document.querySelectorAll('button[data-file-id]').forEach(button => {
             button.addEventListener('click', function () {
-                const fileId = this.getAttribute('data-file-id');
-                console.log('Start OCR button attached to file ID:', fileId);
-                handleStartOCR(fileId);  // Call the function to handle OCR start
+                handleStartOCR(this.getAttribute('data-file-id'));
             });
         });
     }
 
-    // Toggle fold/unfold for rows
-    function toggleFold(event) {
-        const groupIndex = event.currentTarget.dataset.groupIndex;
-        const group = allGroups[groupIndex];
-        group.folded = !group.folded;
-    
-        group.rows.forEach(row => {
-            row.element.style.display = group.folded ? 'none' : 'table-row';
-        });
+    // Pagination function
+    function paginateTable() {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const paginatedItems = allRows.slice(start, end);
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        paginatedItems.forEach(row => projectsList.appendChild(row));
+        updatePaginationControls();
     }
 
-    // Function to attach event listeners to fold/unwrap rows
-    function attachRowListeners() {
-        document.querySelectorAll('.fold-table tr.view').forEach(row => {
-            row.addEventListener('click', toggleFold);
-            console.log('Row fold/unfold listener attached.');
-        });
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(allRows.length / itemsPerPage);
+        const paginationControls = document.getElementById('pagination-controls');
+        paginationControls.innerHTML = '';
+
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item' + (i === currentPage ? ' active' : '');
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', function (event) {
+                event.preventDefault();
+                currentPage = i;
+                paginateTable();
+            });
+            paginationControls.appendChild(li);
+        }
     }
 
     // Sorting function
     function sortTable(columnIndex) {
-        console.log(`Sorting column ${columnIndex} clicked.`);
-    
-        // Toggle direction if sorting the same column, otherwise default to ascending
         if (currentSortColumn === columnIndex) {
             currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
         } else {
             currentSortDirection = 'asc';
         }
-    
+
         currentSortColumn = columnIndex;
-    
-        // Sort groups based on the selected column
-        allGroups.sort((a, b) => {
-            let x, y;
-            if (columnIndex === 1) { // Client Name
-                x = a.clientName.toLowerCase();
-                y = b.clientName.toLowerCase();
-            } else if (columnIndex === 2) { // Project Name
-                x = a.projectName.toLowerCase();
-                y = b.projectName.toLowerCase();
+        allRows.sort((a, b) => {
+            const x = a.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+            const y = b.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+
+            if (columnIndex === 4) {
+                return currentSortDirection === 'asc' ? (new Date(x) - new Date(y)) : (new Date(y) - new Date(x));
             }
-    
-            if (currentSortDirection === 'asc') {
-                return x > y ? 1 : -1;
-            } else {
-                return x < y ? 1 : -1;
-            }
+
+            return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
         });
-    
-        // Within each group, sort the rows by the selected column
-        allGroups.forEach(group => {
-            group.rows.sort((a, b) => {
-                let x = a.values[columnIndex].toLowerCase();
-                let y = b.values[columnIndex].toLowerCase();
-    
-                // Special case for dates
-                if (columnIndex === 4) {
-                    x = new Date(x);
-                    y = new Date(y);
-                }
-    
-                return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
-            });
-        });
-    
+
         paginateTable();
-        attachRowListeners(); // Reapply fold/unfold event listeners
-        attachButtonListeners(); // Reapply button event listeners
     }
-
-    // Function to delete selected rows
-    async function deleteSelected() {
-        console.log('Delete Selected button clicked.');
-        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]:checked');
-        const projectIdsToDelete = Array.from(checkboxes)
-            .map(checkbox => checkbox.getAttribute('data-file-id'))
-            .filter(id => id !== null && id !== undefined);
-
-        if (projectIdsToDelete.length === 0) {
-            alert("Please select at least one project to delete.");
-            return;
-        }
-
-        console.log('Projects to delete:', projectIdsToDelete);
-
-        try {
-            const response = await fetch('/delete_projects', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ project_ids: projectIdsToDelete })
-            });
-
-            if (response.ok) {
-                alert('Projects deleted successfully.');
-                checkboxes.forEach(checkbox => {
-                    const row = checkbox.closest('tr');
-                    row.remove(); // Remove the row from the UI
-                });
-                paginateTable(); // Re-paginate the table
-            } else {
-                const errorData = await response.json();
-                console.error('Failed to delete projects:', errorData);
-                alert('Error: Unable to delete selected projects.');
-            }
-        } catch (error) {
-            console.error('Error deleting projects:', error);
-            alert('An unexpected error occurred. Please try again.');
-        }
-    }
-
-
-    // Event listener for the "select-all" checkbox
-    document.getElementById('select-all').addEventListener('change', function () {
-        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = this.checked;
-        });
-    });
-
 
     // Load projects from the server
     async function loadProjects() {
-        console.log('Loading projects...');
         const response = await fetch('/my_projects');
         const projects = await response.json();
-        console.log('Projects loaded:', projects);
-    
+
         const projectsList = document.getElementById('projects-list');
         projectsList.innerHTML = '';
-        allGroups = [];  // Reset allGroups on reload
-    
-        let groupIndex = 0;
-    
+        allRows = [];
+
         projects.forEach(project => {
-            const groupKey = `${project.client_name}::${project.name}`;
-            let group = allGroups.find(g => g.key === groupKey);
-    
-            if (!group) {
-                group = {
-                    key: groupKey,
-                    clientName: project.client_name,
-                    projectName: project.name,
-                    rows: [],
-                    folded: true
-                };
-    
-                // Create the header row for the group
-                const headerRow = document.createElement('tr');
-                headerRow.classList.add('view');
-                headerRow.dataset.groupIndex = groupIndex;
-                headerRow.innerHTML = `
-                    <td><input type="checkbox"></td>
-                    <td colspan="6"><strong>${project.client_name} - ${project.name}</strong> (${project.files.length} files)</td>
-                `;
-                group.headerRow = headerRow;
-                projectsList.appendChild(headerRow);
-    
-                allGroups.push(group);
-                groupIndex++;
-            }
-    
             project.files.forEach(file => {
-                const fileRow = document.createElement('tr');
-                fileRow.classList.add('fold-content');
-                fileRow.style.display = 'none';
-                fileRow.innerHTML = `
-                    <td data-file-id="${file.id}"><input type="checkbox"></td>
+                const row = document.createElement('tr');
+                row.innerHTML = `
                     <td>${project.client_name}</td>
                     <td>${project.name}</td>
                     <td>${file.name}</td>
@@ -442,103 +318,18 @@
                         ${file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : ''}
                     </td>
                 `;
-    
-                // Store the row and its values for sorting
-                group.rows.push({
-                    element: fileRow,
-                    values: [
-                        project.client_name,
-                        project.name,
-                        file.name,
-                        file.created_at,
-                        file.status
-                    ]
-                });
-    
-                projectsList.appendChild(fileRow);
+                projectsList.appendChild(row);
+                allRows.push(row);
             });
         });
-    
+
         paginateTable();
-        attachRowListeners();      // Attach event listeners for fold/unfold
-        attachButtonListeners();   // Attach event listeners for Start OCR buttons
+        attachButtonListeners();  // Attach button listeners for newly loaded rows
     }
-    
-    // Pagination function
-    function paginateTable() {
-        console.log('Paginating table...');
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        let paginatedGroups = allGroups.slice(start, end);
-    
-        const projectsList = document.getElementById('projects-list');
-        projectsList.innerHTML = '';
-    
-        paginatedGroups.forEach(group => {
-            projectsList.appendChild(group.headerRow);
-            group.rows.forEach(row => {
-                projectsList.appendChild(row.element);
-            });
-        });
-    
-        updatePaginationControls();
-    }
-    
-    // Update pagination controls
-    function updatePaginationControls() {
-        const totalPages = Math.ceil(allGroups.length / itemsPerPage);
-        const paginationControls = document.getElementById('pagination-controls');
-        paginationControls.innerHTML = '';
-    
-        for (let i = 1; i <= totalPages; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item' + (i === currentPage ? ' active' : '');
-            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-            li.addEventListener('click', function (event) {
-                event.preventDefault();
-                console.log('Pagination clicked:', i);
-                currentPage = i;
-                paginateTable();
-            });
-            paginationControls.appendChild(li);
-        }
-    }
-    
-    // Call loadProjects on page load
-    loadProjects();
+
+    loadProjects();  // Load projects on page load
 
     // Poll for status updates every 10 seconds
-    function startPolling() {
-        setInterval(pollStatusUpdates, 10000);
-    }
-
-    startPolling();
-
-    // Polling for status updates
-    async function pollStatusUpdates() {
-        console.log('Polling for status updates...');
-        const response = await fetch('/my_projects');
-        const projects = await response.json();
-        console.log('Status updates received:', projects);
-
-        projects.forEach(project => {
-            project.files.forEach(file => {
-                const statusElement = document.getElementById(`status-${file.id}`);
-                const actionElement = document.getElementById(`action-${file.id}`);
-                if (statusElement && actionElement) {
-                    statusElement.innerText = file.status;
-                    actionElement.innerHTML = file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` :
-                                              file.status === 'Not processed' ? `<button class="btn btn-warning btn-sm" data-file-id="${file.id}">Start OCR</button>` :
-                                              file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
-                                                                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
-                                                                            </div>` :
-                                              file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : '';
-                }
-            });
-        });
-
-        attachButtonListeners();  // Reattach event listeners to buttons after polling updates
-    }
-
+    setInterval(loadProjects, 10000);  // Reload the project list every 10 seconds for updates
 </script>
 {% endblock %}
