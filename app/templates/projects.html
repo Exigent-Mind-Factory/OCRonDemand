@@ -127,24 +127,25 @@
             document.getElementById('project_name').innerHTML = '<option value="">Select Project</option>';
             return;
         }
-    
+
         try {
-            // Encode the client name for use in the URL
-            const encodedClientName = encodeURIComponent(clientName);
-    
+            // Normalize clientName for the backend request
+            const normalizedClientName = clientName.replace(/\s+/g, '_');
+            const encodedClientName = encodeURIComponent(normalizedClientName);
+
             const response = await fetch(`/get_projects_by_client_name/${encodedClientName}`);
             const projects = await response.json();
-            
+
             const projectSelect = document.getElementById('project_name');
             projectSelect.innerHTML = '<option value="">Select Project</option>';
-    
+
             projects.forEach(project => {
                 const option = document.createElement('option');
-                option.value = project.id;
+                option.value = project.name;  // Set value to project name instead of ID
                 option.textContent = project.name;
                 projectSelect.appendChild(option);
             });
-    
+
             console.log('Project dropdown populated with unique projects.');
         } catch (error) {
             console.error('Error fetching projects:', error);
@@ -158,55 +159,64 @@
         populateProjects(clientName);  // Fetch and populate the corresponding projects
     });
 
+
     // Populate clients on page load
     populateClients();
 
-
-
-    // populateClients();  // Populate clients on page load
-
-    // Event listener for Create Project form submission
+    
+    // Debug: Create Project button submission handler
     document.getElementById('create-project-form').addEventListener('submit', async function(event) {
         event.preventDefault();
+        console.log('Create Project button clicked.');
+    
         let clientName = document.getElementById('client_name').value.trim();
         let newClientName = document.getElementById('new_client_name').value.trim();
         let projectName = document.getElementById('project_name').value.trim();
         let newProjectName = document.getElementById('new_project_name').value.trim();
-
+    
         if (!clientName && !newClientName) {
             alert('Please select a client from the dropdown or enter a new client name.');
+            console.log('Client name missing.');
             return;
         }
-
+    
         if (!projectName && !newProjectName) {
             alert('Please select a project from the dropdown or enter a new project name.');
+            console.log('Project name missing.');
             return;
         }
-
+    
         if (newClientName) clientName = newClientName;
         if (newProjectName) projectName = newProjectName;
-
+    
         const formData = { client_name: clientName, project_name: projectName };
-
+        console.log('Form data prepared:', formData);
+    
         try {
             const response = await fetch('/create_project', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-
+    
             if (response.ok) {
                 const data = await response.json();
+                console.log('Project created successfully:', data);
                 alert('Project created successfully');
-                window.location.href = `/ocr/${data.project_id}`;  // Redirect to OCR page
+                window.location.href = `/ocr/${data.project_id}`; // Redirect to OCR page
             } else {
                 const errorData = await response.json();
+                console.log('Error creating project:', errorData);
                 alert(`Error: ${errorData.error}`);
             }
         } catch (error) {
+            console.error('Error creating project:', error);
             alert('An unexpected error occurred. Please try again.');
         }
     });
+    
+
+
 
     // Start OCR functionality
     async function handleStartOCR(fileId) {

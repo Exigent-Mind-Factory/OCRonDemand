@@ -273,17 +273,21 @@ async def get_projects(request, client_id):
         return response.json(project_list)
 
 
+
 @views_bp.route('/get_projects_by_client_name/<client_name>', methods=['GET'])
 async def get_projects_by_client_name(request, client_name):
     with session_scope() as session:
-        # Use case-insensitive comparison for client name
-        client = session.query(Client).filter(func.lower(Client.name) == func.lower(client_name)).first()
+        # Normalize the client_name to handle underscores and spaces
+        normalized_client_name = client_name.replace('_', ' ')  # Convert underscores back to spaces
         
+        # Use case-insensitive comparison with normalized client name
+        client = session.query(Client).filter(func.lower(Client.name) == func.lower(normalized_client_name)).first()
+
         if client:
             projects = session.query(Project).filter_by(client_id=client.id).all()
             project_list = [{"id": project.id, "name": project.name} for project in projects]
             return response.json(project_list)
-        
+
         return response.json([])  # Return an empty list if no matching client found
 
 
