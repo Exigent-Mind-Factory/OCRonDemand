@@ -12,6 +12,11 @@ from celery.result import GroupResult
 import shutil
 import aiofiles
 from aiofiles import os as async_os
+
+from app.models import Project, File, Document
+from sqlalchemy.future import select
+from sqlalchemy.orm import Session
+from sqlalchemy import func  # Import func for case-insensitive comparison
 # from sanic.response import stream
 
 views_bp = Blueprint('views')
@@ -34,6 +39,13 @@ async def home(request):
     user = get_user_from_request(request)
     is_authenticated = user is not None
     return request.app.ctx.jinja.render('home.html', request, user=user, is_authenticated=is_authenticated)
+
+
+@views_bp.route('/projects', methods=['GET'])
+async def projects(request):
+    user = get_user_from_request(request)
+    is_authenticated = user is not None
+    return request.app.ctx.jinja.render('projects.html', request, user=user, is_authenticated=is_authenticated)
 
 
 @views_bp.route('/signup', methods=['GET'])
@@ -246,6 +258,38 @@ async def upload_single_pdf_chunked(request):
     return response.json({'message': 'Chunk uploaded successfully'})
 
 
+@views_bp.route('/get_clients', methods=['GET'])
+async def get_clients(request):
+    with session_scope() as session:
+        clients = session.query(Client).all()
+        client_list = [{"id": client.id, "name": client.name} for client in clients]
+        return response.json(client_list)
+
+@views_bp.route('/get_projects/<client_id>', methods=['GET'])
+async def get_projects(request, client_id):
+    with session_scope() as session:
+        projects = session.query(Project).filter_by(client_id=client_id).all()
+        project_list = [{"id": project.id, "name": project.name} for project in projects]
+        return response.json(project_list)
+
+
+
+@views_bp.route('/get_projects_by_client_name/<client_name>', methods=['GET'])
+async def get_projects_by_client_name(request, client_name):
+    with session_scope() as session:
+        # Normalize the client_name to handle underscores and spaces
+        normalized_client_name = client_name.replace('_', ' ')  # Convert underscores back to spaces
+        
+        # Use case-insensitive comparison with normalized client name
+        client = session.query(Client).filter(func.lower(Client.name) == func.lower(normalized_client_name)).first()
+
+        if client:
+            projects = session.query(Project).filter_by(client_id=client.id).all()
+            project_list = [{"id": project.id, "name": project.name} for project in projects]
+            return response.json(project_list)
+
+        return response.json([])  # Return an empty list if no matching client found
+
 
 @views_bp.route('/start_ocr/<file_id>', methods=['POST'])
 async def start_ocr(request, file_id):
@@ -346,3 +390,45 @@ async def logout(request):
     resp = response.redirect('/login')
     resp.cookies.delete_cookie('user_id')
     return resp
+
+
+@views_bp.route('/delete_projects', methods=['POST'])
+async def delete_projects(request):
+    data = request.json
+    project_ids = data.get('project_ids', [])
+
+    if not project_ids:
+        return response.json({'error': 'No project IDs provided'}, status=400)
+
+    # Open a session and start a transaction
+    with session_scope() as session:
+        try:
+            # Query and delete associated files and documents first
+            files_query = session.query(File).filter(File.project_id.in_(project_ids)).all()
+            documents_query = session.query(Document).filter(Document.project_id.in_(project_ids)).all()
+
+            # Delete associated files
+            for file in files_query:
+                # Make sure the file path exists before trying to remove
+                if os.path.exists(file.file_path):
+                    os.remove(file.file_path)
+                session.delete(file)
+
+            # Delete associated documents
+            for document in documents_query:
+                session.delete(document)
+
+            # Now delete the projects themselves
+            projects_query = session.query(Project).filter(Project.id.in_(project_ids)).all()
+            for project in projects_query:
+                session.delete(project)
+
+            # Commit the transaction
+            session.commit()
+
+            return response.json({'message': 'Projects and associated data deleted successfully'}, status=200)
+        except Exception as e:
+            # Rollback transaction on error
+            session.rollback()
+            print(f"Error deleting projects: {e}")
+            return response.json({'error': 'Failed to delete projects'}, status=500)
