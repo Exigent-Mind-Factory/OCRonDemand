@@ -48,6 +48,9 @@
         a {
             text-decoration: none;
         }
+        th {
+            min-width: 130px;
+        }
         .button-primary {
             background-color: #FF3C00;
             border: 1px #FF3C00 solid;
@@ -144,6 +147,10 @@
             gap: 1rem;
             padding: 7rem 0;
         }
+        .upload-form-container {
+            display: flex;
+            justify-content: center;
+        }
         .footer-text {
             color: #666;
         }
@@ -195,15 +202,15 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
-        const userCookie = document.cookie;
-
-        // Function that checks if a user_id cookie is present
-        function checkUserCookie() {
-            console.log(userCookie);
+        function changeOCRLoginButton () {
+            const loginButton = document.querySelector('.nav-button');
+            const url = window.location.href;
+            if (url.includes('ocr')) {
+                loginButton.textContent = 'Logout';
+            }
         }
 
-        // Call the function when the page loads
-        checkUserCookie();
+        changeOCRLoginButton();
     </script>
 </body>
 </html>
