@@ -33,7 +33,7 @@ def get_user_from_request(request):
 async def home(request):
     user = get_user_from_request(request)
     is_authenticated = user is not None
-    return request.app.ctx.jinja.render('base.html', request, user=user, is_authenticated=is_authenticated)
+    return request.app.ctx.jinja.render('home.html', request, user=user, is_authenticated=is_authenticated)
 
 
 @views_bp.route('/projects', methods=['GET'])
@@ -46,12 +46,14 @@ async def projects(request):
 @views_bp.route('/signup', methods=['GET'])
 async def show_signup_form(request):
     user = get_user_from_request(request)
-    return request.app.ctx.jinja.render('signup.html', request, user=user)
+    is_authenticated = user is not None
+    return request.app.ctx.jinja.render('signup.html', request, user=user, is_authenticated=is_authenticated)
 
 @views_bp.route('/login', methods=['GET'])
 async def show_login_form(request):
     user = get_user_from_request(request)
-    return request.app.ctx.jinja.render('login.html', request, user=user)
+    is_authenticated = user is not None
+    return request.app.ctx.jinja.render('login.html', request, user=user, is_authenticated=is_authenticated)
 
 @views_bp.route('/create_project', methods=['POST'])
 async def create_project(request):
@@ -110,6 +112,7 @@ async def my_projects(request):
 @views_bp.route('/ocr/<project_id>', methods=['GET'])
 async def show_ocr_page(request, project_id):
     user = get_user_from_request(request)
+    is_authenticated = user is not None
     user_id = request.cookies.get('user_id')
     if not user_id:
         return response.redirect('/login')
@@ -119,7 +122,7 @@ async def show_ocr_page(request, project_id):
         if not project:
             return response.redirect('/')
 
-    return request.app.ctx.jinja.render('ocr.html', request, project_id=project_id, user=user)
+    return request.app.ctx.jinja.render('ocr.html', request, project_id=project_id, user=user, is_authenticated=is_authenticated)
 
 @views_bp.route('/upload_single_pdf', methods=['POST'])
 async def upload_single_pdf(request):
