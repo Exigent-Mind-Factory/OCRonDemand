@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="projects-page">
+  <div class="container mt-5">
+      <div class="row mt-5">
+          <div class="col-md-12">
+              <h2>Add/Select Project</h2>
+              <p>Add or select a client and project to proceed to the PDF upload page.</p>
+              <form id="create-project-form" class="mt-4">
+                  <div class="row">
+                      <div class="col-md-6 mb-3">
+                          <label for="client_name" class="form-label">Client Name</label>
+                          <select id="client_name" class="form-select">
+                              <option value="">Select Client</option>
+                          </select>
+                          <input type="text" id="new_client_name" class="form-control mt-2" placeholder="Add New Client Name">
+                      </div>
+                      <div class="col-md-6 mb-3">
+                          <label for="project_name" class="form-label">Project Name</label>
+                          <select id="project_name" class="form-select">
+                              <option value="">Select Project</option>
+                          </select>
+                          <input type="text" id="new_project_name" class="form-control mt-2" placeholder="Add New Project Name">
+                      </div>
+                  </div>
+                  <button type="submit" class="btn btn-primary w-100 button-primary">Proceed To Upload</button>
+              </form>
+          </div>
+      </div>
+  </div>
+
+  <div class="container container-fluid" style="margin-top: 20px;">
+      <div class="row">
+          <div class="col-md-12">
+              <h2>My Projects</h2>
+              <input class="form-control mb-3" id="search-input" type="text" placeholder="Search...">
+              <div class="d-flex justify-content-between mb-2">
+                  <div>
+                      Show
+                      <select id="items-per-page">
+                          <option value="10">10</option>
+                          <option value="20">20</option>
+                          <option value="30">30</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                      </select>
+                      entries
+                  </div>
+              </div>
+              <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                  <table class="table table-bordered" id="projects-table">
+                      <thead>
+                          <tr>
+                              <th onclick="sortTable(1)">Client Name</th>
+                              <th onclick="sortTable(2)">Project Name</th>
+                              <th onclick="sortTable(3)">File Name</th>
+                              <th onclick="sortTable(4)">Date Uploaded</th>
+                              <th onclick="sortTable(5)">Status</th>
+                              <th>Action</th>
+                          </tr>
+                      </thead>
+                      <tbody id="projects-list">
+                          <!-- Rows will be populated dynamically -->
+                      </tbody>
+                  </table>
+                  <ul class="pagination" id="pagination-controls"></ul>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
+
+<script>
+    let currentPage = 1;
+    let itemsPerPage = 10;
+    let allRows = [];
+    let currentSortColumn = null;
+    let currentSortDirection = 'asc';
+
+    // Function to update "Show entries" functionality
+    document.getElementById('items-per-page').addEventListener('change', function () {
+        itemsPerPage = parseInt(this.value);
+        currentPage = 1;  // Reset to page 1 when changing items per page
+        paginateTable();
+    });
+
+    // Add search functionality
+    document.getElementById('search-input').addEventListener('input', function () {
+        const searchValue = this.value.toLowerCase();
+        allRows.forEach(row => {
+            const textContent = Array.from(row.querySelectorAll('td'))
+                .map(td => td.textContent.toLowerCase())
+                .join(' ');
+            row.style.display = textContent.includes(searchValue) ? 'table-row' : 'none';
+        });
+        paginateTable();  // Re-paginate after filtering
+    });
+
+    // Fetch and populate Client Name dropdown
+    async function populateClients() {
+        try {
+            const response = await fetch('/get_clients');
+            const clients = await response.json();
+            const clientSelect = document.getElementById('client_name');
+
+            // Clear existing options
+            clientSelect.innerHTML = '<option value="">Select Client</option>';
+
+            // Populate the dropdown with client names instead of IDs
+            clients.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.name;
+                option.textContent = client.name;
+                clientSelect.appendChild(option);
+            });
+
+            console.log('Client dropdown populated.');
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+        }
+    }
+
+
+    // Fetch and populate Project Name dropdown based on selected client name
+    async function populateProjects(clientName) {
+        if (!clientName) {
+            document.getElementById('project_name').innerHTML = '<option value="">Select Project</option>';
+            return;
+        }
+
+        try {
+            // Normalize clientName for the backend request
+            const normalizedClientName = clientName.replace(/\s+/g, '_');
+            const encodedClientName = encodeURIComponent(normalizedClientName);
+
+            const response = await fetch(`/get_projects_by_client_name/${encodedClientName}`);
+            const projects = await response.json();
+
+            const projectSelect = document.getElementById('project_name');
+            projectSelect.innerHTML = '<option value="">Select Project</option>';
+
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.name;  // Set value to project name instead of ID
+                option.textContent = project.name;
+                projectSelect.appendChild(option);
+            });
+
+            console.log('Project dropdown populated with unique projects.');
+        } catch (error) {
+            console.error('Error fetching projects:', error);
+        }
+    }
+
+
+    // Event listener for Client dropdown change to load corresponding projects
+    document.getElementById('client_name').addEventListener('change', function () {
+        const clientName = this.value;  // Get the client name directly from the dropdown
+        populateProjects(clientName);  // Fetch and populate the corresponding projects
+    });
+
+
+    // Populate clients on page load
+    populateClients();
+
+    
+    // Debug: Create Project button submission handler
+    document.getElementById('create-project-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        console.log('Create Project button clicked.');
+    
+        let clientName = document.getElementById('client_name').value.trim();
+        let newClientName = document.getElementById('new_client_name').value.trim();
+        let projectName = document.getElementById('project_name').value.trim();
+        let newProjectName = document.getElementById('new_project_name').value.trim();
+    
+        if (!clientName && !newClientName) {
+            alert('Please select a client from the dropdown or enter a new client name.');
+            console.log('Client name missing.');
+            return;
+        }
+    
+        if (!projectName && !newProjectName) {
+            alert('Please select a project from the dropdown or enter a new project name.');
+            console.log('Project name missing.');
+            return;
+        }
+    
+        if (newClientName) clientName = newClientName;
+        if (newProjectName) projectName = newProjectName;
+    
+        const formData = { client_name: clientName, project_name: projectName };
+        console.log('Form data prepared:', formData);
+    
+        try {
+            const response = await fetch('/create_project', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+    
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Project created successfully:', data);
+                alert('Project created successfully');
+                window.location.href = `/ocr/${data.project_id}`; // Redirect to OCR page
+            } else {
+                const errorData = await response.json();
+                console.log('Error creating project:', errorData);
+                alert(`Error: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error('Error creating project:', error);
+            alert('An unexpected error occurred. Please try again.');
+        }
+    });
+    
+
+
+
+    // Start OCR functionality
+    async function handleStartOCR(fileId) {
+        try {
+            const response = await fetch(`/start_ocr/${fileId}`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const statusElement = document.getElementById(`status-${fileId}`);
+                const actionElement = document.getElementById(`action-${fileId}`);
+
+                statusElement.innerText = 'Processing';
+                actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
+                                               <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                           </div>`;
+            } else {
+                alert('Error: Unable to start OCR.');
+            }
+        } catch (error) {
+            alert('An unexpected error occurred. Please try again.');
+        }
+    }
+
+    function attachButtonListeners() {
+        document.querySelectorAll('button[data-file-id]').forEach(button => {
+            button.addEventListener('click', function () {
+                handleStartOCR(this.getAttribute('data-file-id'));
+            });
+        });
+    }
+
+    // Pagination function
+    function paginateTable() {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const paginatedItems = allRows.slice(start, end);
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        paginatedItems.forEach(row => projectsList.appendChild(row));
+        updatePaginationControls();
+    }
+
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(allRows.length / itemsPerPage);
+        const paginationControls = document.getElementById('pagination-controls');
+        paginationControls.innerHTML = '';
+
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item' + (i === currentPage ? ' active' : '');
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', function (event) {
+                event.preventDefault();
+                currentPage = i;
+                paginateTable();
+            });
+            paginationControls.appendChild(li);
+        }
+    }
+
+    // Sorting function
+    function sortTable(columnIndex) {
+        if (currentSortColumn === columnIndex) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortDirection = 'asc';
+        }
+
+        currentSortColumn = columnIndex;
+        allRows.sort((a, b) => {
+            const x = a.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+            const y = b.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+
+            if (columnIndex === 4) {
+                return currentSortDirection === 'asc' ? (new Date(x) - new Date(y)) : (new Date(y) - new Date(x));
+            }
+
+            return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+        });
+
+        paginateTable();
+    }
+
+    // Load projects from the server
+    async function loadProjects() {
+        const response = await fetch('/my_projects');
+        const projects = await response.json();
+
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+        allRows = [];
+
+        projects.forEach(project => {
+            project.files.forEach(file => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${project.client_name}</td>
+                    <td>${project.name}</td>
+                    <td>${file.name}</td>
+                    <td>${new Date(file.created_at).toLocaleString()}</td>
+                    <td id="status-${file.id}">${file.status}</td>
+                    <td id="action-${file.id}">
+                        ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` : ''}
+                        ${file.status === 'Not processed' ? `<button class="btn btn-warning btn-sm" data-file-id="${file.id}">Start OCR</button>` : ''}
+                        ${file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
+                                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                                        </div>` : ''}
+                        ${file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : ''}
+                    </td>
+                `;
+                projectsList.appendChild(row);
+                allRows.push(row);
+            });
+        });
+
+        paginateTable();
+        attachButtonListeners();  // Attach button listeners for newly loaded rows
+    }
+
+    loadProjects();  // Load projects on page load
+
+    // Poll for status updates every 10 seconds
+    setInterval(loadProjects, 10000);  // Reload the project list every 10 seconds for updates
+</script>
+{% endblock %}
