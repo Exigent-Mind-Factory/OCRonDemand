@@ -3,17 +3,6 @@
 {% block content %}
 <div class="projects-page">
   <div class="container mt-5">
-      <!-- <div class="nav-button-container">
-          <form id="logout-form" action="/logout" method="POST">
-              <button type="submit" class="btn btn-secondary nav-button">Logout</button>
-          </form>
-      </div> -->
-      <!-- <div class="text-center">
-          <h1>Welcome to MorOCRonDemand</h1>
-          <p class="lead">Morae Global's cutting-edge OCR solution for all your document processing needs.</p>
-      </div> -->
-  
-      <!-- Section for Creating a Project -->
       <div class="row mt-5">
           <div class="col-md-12">
               <h2>Create a New Project</h2>
@@ -23,7 +12,6 @@
                           <label for="client_name" class="form-label">Client Name</label>
                           <select id="client_name" class="form-select">
                               <option value="">Select Client</option>
-                              <!-- Populate with existing clients -->
                           </select>
                           <input type="text" id="new_client_name" class="form-control mt-2" placeholder="Add New Client Name">
                       </div>
@@ -31,7 +19,6 @@
                           <label for="project_name" class="form-label">Project Name</label>
                           <select id="project_name" class="form-select">
                               <option value="">Select Project</option>
-                              <!-- Populate with existing projects -->
                           </select>
                           <input type="text" id="new_project_name" class="form-control mt-2" placeholder="Add New Project Name">
                       </div>
@@ -41,7 +28,7 @@
           </div>
       </div>
   </div>
-  
+
   <div class="container container-fluid" style="margin-top: 20px;">
       <div class="row">
           <div class="col-md-12">
@@ -66,16 +53,16 @@
                       <thead>
                           <tr>
                               <th><input type="checkbox" id="select-all"></th>
-                              <th>Client Name</th>
-                              <th>Project Name</th>
-                              <th>File Name</th>
-                              <th>Date Uploaded</th>
-                              <th>Status</th>
+                              <th onclick="sortTable(1)">Client Name</th>
+                              <th onclick="sortTable(2)">Project Name</th>
+                              <th onclick="sortTable(3)">File Name</th>
+                              <th onclick="sortTable(4)">Date Uploaded</th>
+                              <th onclick="sortTable(5)">Status</th>
                               <th>Action</th>
                           </tr>
                       </thead>
                       <tbody id="projects-list">
-                          <!-- Populate with grouped projects -->
+                          <!-- Rows will be populated dynamically -->
                       </tbody>
                   </table>
                   <ul class="pagination" id="pagination-controls"></ul>
@@ -89,140 +76,136 @@
     let currentPage = 1;
     let itemsPerPage = 10;
     let allRows = [];
+    let currentSortColumn = null;
+    let currentSortDirection = 'asc';
 
-    document.getElementById('items-per-page').addEventListener('change', function () {
-        itemsPerPage = parseInt(this.value);
-        paginateTable();
-    });
-
-    document.getElementById('select-all').addEventListener('click', function () {
-        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
-        checkboxes.forEach(checkbox => checkbox.checked = this.checked);
-    });
-
-    function deleteSelected() {
-        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]:checked');
-        checkboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            row.remove(); // Remove the row from the DOM
+    // Add search functionality
+    document.getElementById('search-input').addEventListener('input', function() {
+        const searchValue = this.value.toLowerCase();
+        allRows.forEach(row => {
+            const textContent = Array.from(row.querySelectorAll('td'))
+                .map(td => td.textContent.toLowerCase())
+                .join(' ');  // Combine the content of all <td> elements in the row
+            row.style.display = textContent.includes(searchValue) ? 'table-row' : 'none';
         });
-        // Recalculate pagination and display the updated rows
-        allRows = document.querySelectorAll('#projects-list tr');
-        paginateTable();
-    }
+        paginateTable();  // Re-paginate the table after filtering
+    });
 
-    function sortTable(n) {
-        let table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-        table = document.getElementById("projects-table");
-        switching = true;
-        dir = "asc"; 
-        while (switching) {
-            switching = false;
-            rows = table.rows;
-            for (i = 1; i < (rows.length - 1); i++) {
-                shouldSwitch = false;
-                x = rows[i].getElementsByTagName("TD")[n];
-                y = rows[i + 1].getElementsByTagName("TD")[n];
-                if (dir === "asc") {
-                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                } else if (dir === "desc") {
-                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                        shouldSwitch = true;
-                        break;
-                    }
-                }
-            }
-            if (shouldSwitch) {
-                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-                switching = true;
-                switchcount++;
-            } else {
-                if (switchcount === 0 && dir === "asc") {
-                    dir = "desc";
-                    switching = true;
-                }
-            }
-        }
-    }
-
-    function paginateTable() {
-        const start = (currentPage - 1) * itemsPerPage;
-        const end = start + itemsPerPage;
-        const paginatedItems = Array.from(allRows).slice(start, end);
-        const projectsList = document.getElementById('projects-list');
-        projectsList.innerHTML = '';
-        paginatedItems.forEach(row => projectsList.appendChild(row));
-        updatePaginationControls();
-    }
-
-    function updatePaginationControls() {
-        const totalPages = Math.ceil(allRows.length / itemsPerPage);
-        const paginationControls = document.getElementById('pagination-controls');
-        paginationControls.innerHTML = '';
-
-        for (let i = 1; i <= totalPages; i++) {
-            const li = document.createElement('li');
-            li.className = 'page-item' + (i === currentPage ? ' active' : '');
-            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-            li.addEventListener('click', function (event) {
-                event.preventDefault();
-                currentPage = i;
-                paginateTable();
+    // Fetch and populate Client Name dropdown
+    async function populateClients() {
+        try {
+            const response = await fetch('/get_clients');
+            const clients = await response.json();
+            const clientSelect = document.getElementById('client_name');
+    
+            // Clear existing options
+            clientSelect.innerHTML = '<option value="">Select Client</option>';
+    
+            // Populate the dropdown with clients
+            clients.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name;
+                clientSelect.appendChild(option);
             });
-            paginationControls.appendChild(li);
+    
+            console.log('Client dropdown populated.');
+        } catch (error) {
+            console.error('Error fetching clients:', error);
+        }
+    }
+    
+
+    // Fetch and populate Project Name dropdown based on selected client
+    async function populateProjects(clientId) {
+        if (!clientId) {
+            document.getElementById('project_name').innerHTML = '<option value="">Select Project</option>';
+            return;
+        }
+    
+        try {
+            const response = await fetch(`/get_projects/${clientId}`);
+            const projects = await response.json();
+            const projectSelect = document.getElementById('project_name');
+    
+            // Clear existing options to avoid duplicates
+            projectSelect.innerHTML = '<option value="">Select Project</option>';
+    
+            // Create a Set to store unique project names
+            const projectNamesSet = new Set();
+    
+            // Populate the dropdown with unique projects
+            projects.forEach(project => {
+                if (!projectNamesSet.has(project.name)) {
+                    projectNamesSet.add(project.name);  // Add to Set to ensure uniqueness
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = project.name;
+                    projectSelect.appendChild(option);
+                }
+            });
+    
+            console.log('Project dropdown populated with unique projects.');
+        } catch (error) {
+            console.error('Error fetching projects:', error);
         }
     }
 
+    
+
+    // Event listener for Client dropdown change to load corresponding projects
+    document.getElementById('client_name').addEventListener('change', function () {
+        const clientId = this.value;
+        populateProjects(clientId);
+    });
+    
+    // Call the function to populate clients on page load
+    populateClients();
+
+
+    // Debug: Create Project button submission handler
     document.getElementById('create-project-form').addEventListener('submit', async function(event) {
         event.preventDefault();
+        console.log('Create Project button clicked.');
 
         let clientName = document.getElementById('client_name').value.trim();
         let newClientName = document.getElementById('new_client_name').value.trim();
         let projectName = document.getElementById('project_name').value.trim();
         let newProjectName = document.getElementById('new_project_name').value.trim();
 
-        // Use the dropdown values if they exist, otherwise use the input field values
         if (!clientName && !newClientName) {
             alert('Please select a client from the dropdown or enter a new client name.');
+            console.log('Client name missing.');
             return;
         }
 
         if (!projectName && !newProjectName) {
             alert('Please select a project from the dropdown or enter a new project name.');
+            console.log('Project name missing.');
             return;
         }
 
-        if (newClientName) {
-            clientName = newClientName;
-        }
+        if (newClientName) clientName = newClientName;
+        if (newProjectName) projectName = newProjectName;
 
-        if (newProjectName) {
-            projectName = newProjectName;
-        }
-
-        const formData = {
-            client_name: clientName,
-            project_name: projectName
-        };
+        const formData = { client_name: clientName, project_name: projectName };
+        console.log('Form data prepared:', formData);
 
         try {
             const response = await fetch('/create_project', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
 
             if (response.ok) {
                 const data = await response.json();
+                console.log('Project created successfully:', data);
                 alert('Project created successfully');
-                window.location.href = `/ocr/${data.project_id}`; // Redirect to ocr.html for the project
+                window.location.href = `/ocr/${data.project_id}`; // Redirect to OCR page
             } else {
                 const errorData = await response.json();
+                console.log('Error creating project:', errorData);
                 alert(`Error: ${errorData.error}`);
             }
         } catch (error) {
@@ -231,77 +214,312 @@
         }
     });
 
+    // Debug: Event listener for Start OCR button click
+    async function handleStartOCR(fileId) {
+        console.log('Start OCR button clicked for file ID:', fileId);
+        try {
+            const response = await fetch(`/start_ocr/${fileId}`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                const statusElement = document.getElementById(`status-${fileId}`);
+                const actionElement = document.getElementById(`action-${fileId}`);
+
+                if (statusElement && actionElement) {
+                    statusElement.innerText = 'Processing';
+                    actionElement.innerHTML = `
+                        <div class="progress mt-3" style="height: 20px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                        </div>
+                    `;
+                }
+
+                console.log('OCR processing started for file ID:', fileId);
+                alert('OCR processing started for the file.');
+            } else {
+                console.error('Failed to start OCR for file ID:', fileId);
+                alert('Error: Unable to start OCR.');
+            }
+        } catch (error) {
+            console.error('Error starting OCR:', error);
+            alert('An unexpected error occurred. Please try again.');
+        }
+    }
+
+    // Function to attach event listeners to Start OCR buttons
+    function attachButtonListeners() {
+        document.querySelectorAll('button[data-file-id]').forEach(button => {
+            button.addEventListener('click', function () {
+                const fileId = this.getAttribute('data-file-id');
+                console.log('Start OCR button attached to file ID:', fileId);
+                handleStartOCR(fileId);  // Call the function to handle OCR start
+            });
+        });
+    }
+
+    // Toggle fold/unfold for rows
+    function toggleFold(event) {
+        const groupIndex = event.currentTarget.dataset.groupIndex;
+        const group = allGroups[groupIndex];
+        group.folded = !group.folded;
+    
+        group.rows.forEach(row => {
+            row.element.style.display = group.folded ? 'none' : 'table-row';
+        });
+    }
+
+    // Function to attach event listeners to fold/unwrap rows
+    function attachRowListeners() {
+        document.querySelectorAll('.fold-table tr.view').forEach(row => {
+            row.addEventListener('click', toggleFold);
+            console.log('Row fold/unfold listener attached.');
+        });
+    }
+
+    // Sorting function
+    function sortTable(columnIndex) {
+        console.log(`Sorting column ${columnIndex} clicked.`);
+    
+        // Toggle direction if sorting the same column, otherwise default to ascending
+        if (currentSortColumn === columnIndex) {
+            currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortDirection = 'asc';
+        }
+    
+        currentSortColumn = columnIndex;
+    
+        // Sort groups based on the selected column
+        allGroups.sort((a, b) => {
+            let x, y;
+            if (columnIndex === 1) { // Client Name
+                x = a.clientName.toLowerCase();
+                y = b.clientName.toLowerCase();
+            } else if (columnIndex === 2) { // Project Name
+                x = a.projectName.toLowerCase();
+                y = b.projectName.toLowerCase();
+            }
+    
+            if (currentSortDirection === 'asc') {
+                return x > y ? 1 : -1;
+            } else {
+                return x < y ? 1 : -1;
+            }
+        });
+    
+        // Within each group, sort the rows by the selected column
+        allGroups.forEach(group => {
+            group.rows.sort((a, b) => {
+                let x = a.values[columnIndex].toLowerCase();
+                let y = b.values[columnIndex].toLowerCase();
+    
+                // Special case for dates
+                if (columnIndex === 4) {
+                    x = new Date(x);
+                    y = new Date(y);
+                }
+    
+                return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+            });
+        });
+    
+        paginateTable();
+        attachRowListeners(); // Reapply fold/unfold event listeners
+        attachButtonListeners(); // Reapply button event listeners
+    }
+
+    // Function to delete selected rows
+    async function deleteSelected() {
+        console.log('Delete Selected button clicked.');
+        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]:checked');
+        const projectIdsToDelete = Array.from(checkboxes)
+            .map(checkbox => checkbox.getAttribute('data-file-id'))
+            .filter(id => id !== null && id !== undefined);
+
+        if (projectIdsToDelete.length === 0) {
+            alert("Please select at least one project to delete.");
+            return;
+        }
+
+        console.log('Projects to delete:', projectIdsToDelete);
+
+        try {
+            const response = await fetch('/delete_projects', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ project_ids: projectIdsToDelete })
+            });
+
+            if (response.ok) {
+                alert('Projects deleted successfully.');
+                checkboxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    row.remove(); // Remove the row from the UI
+                });
+                paginateTable(); // Re-paginate the table
+            } else {
+                const errorData = await response.json();
+                console.error('Failed to delete projects:', errorData);
+                alert('Error: Unable to delete selected projects.');
+            }
+        } catch (error) {
+            console.error('Error deleting projects:', error);
+            alert('An unexpected error occurred. Please try again.');
+        }
+    }
+
+
+    // Event listener for the "select-all" checkbox
+    document.getElementById('select-all').addEventListener('change', function () {
+        const checkboxes = document.querySelectorAll('#projects-list input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+
+
+    // Load projects from the server
     async function loadProjects() {
+        console.log('Loading projects...');
         const response = await fetch('/my_projects');
         const projects = await response.json();
-
+        console.log('Projects loaded:', projects);
+    
         const projectsList = document.getElementById('projects-list');
         projectsList.innerHTML = '';
-        allRows = []; // Reset allRows on reload
-
-        // Group projects by client name and project name
-        const groupedProjects = {};
+        allGroups = [];  // Reset allGroups on reload
+    
+        let groupIndex = 0;
+    
         projects.forEach(project => {
-            const key = `${project.client_name}::${project.name}`;
-            if (!groupedProjects[key]) {
-                groupedProjects[key] = [];
+            const groupKey = `${project.client_name}::${project.name}`;
+            let group = allGroups.find(g => g.key === groupKey);
+    
+            if (!group) {
+                group = {
+                    key: groupKey,
+                    clientName: project.client_name,
+                    projectName: project.name,
+                    rows: [],
+                    folded: true
+                };
+    
+                // Create the header row for the group
+                const headerRow = document.createElement('tr');
+                headerRow.classList.add('view');
+                headerRow.dataset.groupIndex = groupIndex;
+                headerRow.innerHTML = `
+                    <td><input type="checkbox"></td>
+                    <td colspan="6"><strong>${project.client_name} - ${project.name}</strong> (${project.files.length} files)</td>
+                `;
+                group.headerRow = headerRow;
+                projectsList.appendChild(headerRow);
+    
+                allGroups.push(group);
+                groupIndex++;
             }
-            groupedProjects[key].push(...project.files);
-        });
-
-        for (const [key, files] of Object.entries(groupedProjects)) {
-            const [clientName, projectName] = key.split('::');
-
-            // Main row (collapsible)
-            const mainRow = document.createElement('tr');
-            mainRow.classList.add('view');
-            mainRow.innerHTML = `
-                <td><input type="checkbox"></td>
-                <td colspan="6"><strong>${clientName} - ${projectName}</strong> (${files.length} files)</td>
-            `;
-            allRows.push(mainRow);
-
-            // Files rows (initially hidden)
-            files.forEach(file => {
+    
+            project.files.forEach(file => {
                 const fileRow = document.createElement('tr');
                 fileRow.classList.add('fold-content');
-                fileRow.style.display = 'none';  // Ensure rows are initially hidden
+                fileRow.style.display = 'none';
                 fileRow.innerHTML = `
-                    <td><input type="checkbox"></td>
-                    <td>${clientName}</td>
-                    <td>${projectName}</td>
+                    <td data-file-id="${file.id}"><input type="checkbox"></td>
+                    <td>${project.client_name}</td>
+                    <td>${project.name}</td>
                     <td>${file.name}</td>
                     <td>${new Date(file.created_at).toLocaleString()}</td>
                     <td id="status-${file.id}">${file.status}</td>
                     <td id="action-${file.id}">
                         ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` : ''}
-                        ${file.status === 'Not processed' ? `<button onclick="startOCR(${file.id})" class="btn btn-warning btn-sm">Start OCR</button>` : ''}
+                        ${file.status === 'Not processed' ? `<button class="btn btn-warning btn-sm" data-file-id="${file.id}">Start OCR</button>` : ''}
                         ${file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
                                                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
                                                         </div>` : ''}
-                        ${file.status === 'Failed' ? `<button onclick="checkError(${file.id})" class="btn btn-danger btn-sm">Show Error</button>` : ''}
+                        ${file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : ''}
                     </td>
                 `;
-                allRows.push(fileRow);
+    
+                // Store the row and its values for sorting
+                group.rows.push({
+                    element: fileRow,
+                    values: [
+                        project.client_name,
+                        project.name,
+                        file.name,
+                        file.created_at,
+                        file.status
+                    ]
+                });
+    
+                projectsList.appendChild(fileRow);
             });
-        }
-
-        paginateTable();
-
-        document.getElementById('search-input').addEventListener('keyup', function() {
-            const value = this.value.toLowerCase();
-            const rows = document.getElementById('projects-list').getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const rowText = row.textContent || row.innerText;
-                row.style.display = rowText.toLowerCase().indexOf(value) > -1 ? '' : 'none';
-            }
         });
+    
+        paginateTable();
+        attachRowListeners();      // Attach event listeners for fold/unfold
+        attachButtonListeners();   // Attach event listeners for Start OCR buttons
+    }
+    
+    // Pagination function
+    function paginateTable() {
+        console.log('Paginating table...');
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        let paginatedGroups = allGroups.slice(start, end);
+    
+        const projectsList = document.getElementById('projects-list');
+        projectsList.innerHTML = '';
+    
+        paginatedGroups.forEach(group => {
+            projectsList.appendChild(group.headerRow);
+            group.rows.forEach(row => {
+                projectsList.appendChild(row.element);
+            });
+        });
+    
+        updatePaginationControls();
+    }
+    
+    // Update pagination controls
+    function updatePaginationControls() {
+        const totalPages = Math.ceil(allGroups.length / itemsPerPage);
+        const paginationControls = document.getElementById('pagination-controls');
+        paginationControls.innerHTML = '';
+    
+        for (let i = 1; i <= totalPages; i++) {
+            const li = document.createElement('li');
+            li.className = 'page-item' + (i === currentPage ? ' active' : '');
+            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+            li.addEventListener('click', function (event) {
+                event.preventDefault();
+                console.log('Pagination clicked:', i);
+                currentPage = i;
+                paginateTable();
+            });
+            paginationControls.appendChild(li);
+        }
+    }
+    
+    // Call loadProjects on page load
+    loadProjects();
+
+    // Poll for status updates every 10 seconds
+    function startPolling() {
+        setInterval(pollStatusUpdates, 10000);
     }
 
+    startPolling();
+
+    // Polling for status updates
     async function pollStatusUpdates() {
+        console.log('Polling for status updates...');
         const response = await fetch('/my_projects');
         const projects = await response.json();
+        console.log('Status updates received:', projects);
 
         projects.forEach(project => {
             project.files.forEach(file => {
@@ -310,91 +528,17 @@
                 if (statusElement && actionElement) {
                     statusElement.innerText = file.status;
                     actionElement.innerHTML = file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` :
-                                              file.status === 'Not processed' ? `<button onclick="startOCR(${file.id})" class="btn btn-warning btn-sm">Start OCR</button>` :
+                                              file.status === 'Not processed' ? `<button class="btn btn-warning btn-sm" data-file-id="${file.id}">Start OCR</button>` :
                                               file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
                                                                                 <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
                                                                             </div>` :
-                                              file.status === 'Failed' ? `<button onclick="checkError(${file.id})" class="btn btn-danger btn-sm">Show Error</button>` : '';
+                                              file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : '';
                 }
             });
         });
+
+        attachButtonListeners();  // Reattach event listeners to buttons after polling updates
     }
-
-    function startPolling() {
-        // Poll every 10 seconds (10000 ms)
-        setInterval(pollStatusUpdates, 10000);
-    }
-
-    async function loadDropdowns() {
-        const response = await fetch('/my_projects');
-        const projects = await response.json();
-    
-        const clientDropdown = document.getElementById('client_name');
-        const projectDropdown = document.getElementById('project_name');
-        clientDropdown.innerHTML = '<option value="">Select Client</option>';
-        projectDropdown.innerHTML = '<option value="">Select Project</option>';
-    
-        const clients = new Set();
-        const projectsSet = new Set();
-    
-        projects.forEach(project => {
-            clients.add(project.client_name);
-            if (!projectsSet.has(project.name)) { // Ensure unique project names
-                projectsSet.add(project.name);
-                const projectOption = document.createElement('option');
-                projectOption.value = project.name;
-                projectOption.text = project.name;
-                projectDropdown.appendChild(projectOption);
-            }
-        });
-    
-        clients.forEach(client => {
-            const clientOption = document.createElement('option');
-            clientOption.value = client;
-            clientOption.text = client;
-            clientDropdown.appendChild(clientOption);
-        });
-    }
-
-    loadProjects();
-    loadDropdowns();
-    startPolling(); // Start polling for status updates
-
-    async function startOCR(fileId) {
-        const response = await fetch(`/start_ocr/${fileId}`, {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            alert('OCR started successfully');
-            loadProjects();
-        } else {
-            const errorData = await response.json();
-            alert(`Error: ${errorData.error}`);
-        }
-    }
-
-    async function checkError(fileId) {
-        const response = await fetch(`/check_error/${fileId}`);
-        const errorData = await response.json();
-        alert(`Error: ${errorData.error}`);
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const table = document.querySelector('.fold-table');
-        table.addEventListener('click', function(event) {
-            const viewRow = event.target.closest('.view');
-            if (viewRow) {
-                let nextRow = viewRow.nextElementSibling;  // Change const to let
-                while (nextRow && nextRow.classList.contains('fold-content')) {
-                    nextRow.style.display = nextRow.style.display === 'none' ? 'table-row' : 'none';
-                    nextRow = nextRow.nextElementSibling;
-                }
-            }
-        });
-    });
-    
-
 
 </script>
 {% endblock %}
