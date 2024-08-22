@@ -259,6 +259,7 @@
         projectsList.innerHTML = '';
         paginatedItems.forEach(row => projectsList.appendChild(row));
         updatePaginationControls();
+        attachButtonListeners();  // Reattach event listeners after pagination
     }
 
     function updatePaginationControls() {
