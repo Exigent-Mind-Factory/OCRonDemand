@@ -63,6 +63,7 @@ alembic/versions/
 # Test files
 test.pdf
 test.py
+*.pdf
 
 # System files
 .DS_Store
