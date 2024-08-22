@@ -31,8 +31,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Verify that alembic is installed
 RUN alembic --help || (echo "Alembic not found!" && exit 1)
 
-# Make port 8777 available to the world outside this container
-EXPOSE 8777
+# Make port 8778 available to the world outside this container
+EXPOSE 8778
 
 # Define environment variable
 ENV PYTHONUNBUFFERED=1
