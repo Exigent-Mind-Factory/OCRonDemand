@@ -33,4 +33,4 @@ app.blueprint(auth_bp)
 app.blueprint(views_bp)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8777)
+    app.run(host='0.0.0.0', port=8778)
