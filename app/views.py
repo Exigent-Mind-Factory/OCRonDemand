@@ -363,7 +363,7 @@ async def download_file(request, file_id):
         # Construct the OCR'ed filename
         original_filename = file_entry.file_name
         base_name, ext = os.path.splitext(original_filename)
-        ocr_filename = f"{base_name}_OCRed{ext}"
+        ocr_filename = f"{base_name}_OCRed_with_bookmarks{ext}"
         file_path = os.path.join(os.path.dirname(file_entry.file_path), ocr_filename)
 
         if not os.path.exists(file_path):

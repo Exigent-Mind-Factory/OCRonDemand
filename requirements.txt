@@ -14,3 +14,5 @@ pycryptodome
 pikepdf==8.15.1
 sanic-wtf
 aiofiles
+pymupdf
+pandas
