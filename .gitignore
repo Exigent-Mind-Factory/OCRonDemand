@@ -114,3 +114,10 @@ site/
 # Shell script
 launch.sh
 wait-for-it.sh
+
+
+# Ignore all .tiff files
+*.tiff
+
+# Ignore ImageMagick directory
+ImageMagick/

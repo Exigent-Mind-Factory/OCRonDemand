@@ -218,37 +218,14 @@
     
 
 
-
-    // Start OCR functionality
-    async function handleStartOCR(fileId) {
-        try {
-            const response = await fetch(`/start_ocr/${fileId}`, {
-                method: 'POST'
-            });
-
-            if (response.ok) {
-                const statusElement = document.getElementById(`status-${fileId}`);
-                const actionElement = document.getElementById(`action-${fileId}`);
-
-                statusElement.innerText = 'Processing';
-                actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
-                                               <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
-                                           </div>`;
-            } else {
-                alert('Error: Unable to start OCR.');
-            }
-        } catch (error) {
-            alert('An unexpected error occurred. Please try again.');
-        }
-    }
-
     function attachButtonListeners() {
         document.querySelectorAll('button[data-file-id]').forEach(button => {
             button.addEventListener('click', function () {
-                handleStartOCR(this.getAttribute('data-file-id'));
+                startOcrProcess(this.getAttribute('data-file-id'));
             });
         });
     }
+    
 
     // Pagination function
     function paginateTable() {
@@ -303,15 +280,16 @@
         paginateTable();
     }
 
+
     // Load projects from the server
     async function loadProjects() {
         const response = await fetch('/my_projects');
         const projects = await response.json();
-
+    
         const projectsList = document.getElementById('projects-list');
         projectsList.innerHTML = '';
         allRows = [];
-
+    
         projects.forEach(project => {
             project.files.forEach(file => {
                 const row = document.createElement('tr');
@@ -323,7 +301,15 @@
                     <td id="status-${file.id}">${file.status}</td>
                     <td id="action-${file.id}">
                         ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` : ''}
-                        ${file.status === 'Not processed' ? `<button class="btn btn-warning btn-sm" data-file-id="${file.id}">Start OCR</button>` : ''}
+                        ${file.status === 'Not processed' ? `
+                            <div class="form-group">
+                                <label for="ocr_option-${file.id}">OCR Option:</label>
+                                <select id="ocr_option-${file.id}" class="form-control">
+                                    <option value="basic">Basic OCR</option>
+                                    <option value="advanced">Advanced OCR</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-warning btn-sm" data-file-id="${file.id}" onclick="startOcrProcess(${file.id})">Start OCR</button>` : ''}
                         ${file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
                                                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
                                                         </div>` : ''}
@@ -334,10 +320,40 @@
                 allRows.push(row);
             });
         });
-
+    
         paginateTable();
         attachButtonListeners();  // Attach button listeners for newly loaded rows
     }
+    
+    // Start OCR process function
+    async function startOcrProcess(fileId) {
+        const ocrOption = document.getElementById(`ocr_option-${fileId}`).value;
+        
+        try {
+            const response = await fetch(`/start_ocr/${fileId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ocr_option: ocrOption })
+            });
+    
+            if (response.ok) {
+                const statusElement = document.getElementById(`status-${fileId}`);
+                const actionElement = document.getElementById(`action-${fileId}`);
+    
+                statusElement.innerText = 'Processing';
+                actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
+                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                        </div>`;
+            } else {
+                alert('Error: Unable to start OCR.');
+            }
+        } catch (error) {
+            alert('An unexpected error occurred. Please try again.');
+        }
+    }
+    
+
+
 
     loadProjects();  // Load projects on page load
 

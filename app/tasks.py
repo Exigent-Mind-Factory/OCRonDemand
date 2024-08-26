@@ -14,7 +14,7 @@ celery.config_from_object(CeleryConfig)
 
 
 @celery.task
-def ocr_pdf_file(file_id):
+def ocr_pdf_file(file_id, ocr_option="basic"):
     with session_scope() as session:
         file_entry = session.query(File).filter_by(id=file_id).first()
         if not file_entry:
@@ -29,9 +29,9 @@ def ocr_pdf_file(file_id):
         if not batch_files:
             return {"error": "Failed to burst the PDF", "file_path": file_entry.file_path}
 
-        # Step 3: Run OCR on each batch asynchronously
+        # Step 3: Run OCR on each batch asynchronously, passing the OCR option to each batch task
         ocr_tasks = group(
-            ocr_pdf_page_batch.s(file_id, batch_file, start_page, end_page)
+            ocr_pdf_page_batch.s(file_id, batch_file, start_page, end_page, ocr_option)
             for start_page, end_page, batch_file in batch_files
         )
 
@@ -44,13 +44,13 @@ def ocr_pdf_file(file_id):
 
 
 @celery.task
-def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page):
+def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page, ocr_option="basic"):
     try:
         if not os.path.exists(batch_file_path):
             raise FileNotFoundError(f"Batch file not found: {batch_file_path}")
 
-        # Step 4: Apply OCR to the batch file
-        ocr_file = apply_ocr_on_pdf(batch_file_path)
+        # Step 4: Apply OCR to the batch file, passing the selected OCR option
+        ocr_file = apply_ocr_on_pdf(batch_file_path, ocr_option)
         return {
             "start_page": start_page,
             "end_page": end_page,
@@ -58,6 +58,7 @@ def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page):
         }
     except Exception as e:
         return {"error": str(e), "batch_file_path": batch_file_path}
+
 
 
 @celery.task
@@ -124,8 +125,8 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
             session.commit()
 
             # Cleanup temporary directory
-            tmp_dir = os.path.join(output_dir, 'tmp')
-            cleanup_tmp_dir(tmp_dir)
+            # tmp_dir = os.path.join(output_dir, 'tmp')
+            # cleanup_tmp_dir(tmp_dir)
 
         except KeyError as e:
             print(f"Error merging PDFs: missing key {e}")

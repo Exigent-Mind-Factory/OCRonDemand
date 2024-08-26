@@ -4,8 +4,8 @@ FROM python:3.11-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Install necessary packages, including `tesseract-ocr`, `ocrmypdf`, and other dependencies
-RUN apt-get update && apt-get install -y \
+# Install necessary packages, including ImageMagick, `tesseract-ocr`, `ocrmypdf`, and other dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     coreutils \
     tesseract-ocr \
@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libjpeg-dev \
     libpq-dev \
+    imagemagick \
+    libmagickwand-dev \
     build-essential \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -25,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 # Copy the current directory contents into the container at /app
 COPY . /app
 
-# Install any needed packages specified in requirements.txt
+# Install any needed Python packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Verify that alembic is installed

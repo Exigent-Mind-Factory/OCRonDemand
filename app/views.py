@@ -293,6 +293,8 @@ async def get_projects_by_client_name(request, client_name):
 
 @views_bp.route('/start_ocr/<file_id>', methods=['POST'])
 async def start_ocr(request, file_id):
+    ocr_option = request.json.get('ocr_option', 'basic')  # Default to 'basic' if not provided
+    
     with session_scope() as session:
         file_entry = session.query(File).filter_by(id=file_id).first()
         if not file_entry:
@@ -301,8 +303,8 @@ async def start_ocr(request, file_id):
         file_entry.status = 'Processing'
         session.commit()
 
-        # Start the OCR process by calling ocr_pdf_file
-        ocr_pdf_file.delay(file_id)
+        # Start the OCR process by calling ocr_pdf_file with the ocr_option
+        ocr_pdf_file.delay(file_id, ocr_option)
 
     return response.json({'message': 'OCR processing started successfully'})
 
