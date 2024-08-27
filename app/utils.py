@@ -2,6 +2,11 @@ import os
 import subprocess
 from contextlib import contextmanager
 from PyPDF2 import PdfReader, PdfWriter
+try:
+    from PyPDF2 import PdfMerger
+except ImportError:
+    from PyPDF2 import PdfFileMerger as PdfMerger
+
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from config import Config
@@ -9,6 +14,11 @@ import shutil
 import logging
 import fitz
 import pandas as pd
+import glob
+import gc
+from app.models import File
+from datetime import datetime
+
 
 
 # Import the User model from the models.py file
@@ -39,9 +49,10 @@ def get_user_by_email(session, email):
 
 class PDFManipulator:
 
-    def __init__(self, input_pdf_path, outcome_pdf_path):
+    def __init__(self, input_pdf_path, outcome_pdf_path, file_id):
         self.input_pdf_path = input_pdf_path
         self.outcome_pdf_path = outcome_pdf_path
+        self.file_id = file_id
 
     def remove_signature(self):
         # Removing signature from the PDF
@@ -54,9 +65,20 @@ class PDFManipulator:
 
             with open(self.outcome_pdf_path, 'wb') as output_file:
                 writer.write(output_file)
+                
+    def update_status(self, status):
+        """Update the status of the file in the database"""
+        with session_scope() as session:
+            file_entry = session.query(File).filter_by(id=self.file_id).first()
+            if file_entry:
+                file_entry.status = status
+                file_entry.completed_at = datetime.utcnow()
+                session.commit()
 
     def apply_ocr(self, ocr_option="basic"):
         try:
+            self.update_status('Processing')  # Set status to processing
+            
             # Ensure that the signature is removed first
             self.remove_signature()
 
@@ -74,47 +96,65 @@ class PDFManipulator:
                 subprocess.run(cmd, check=True)
 
             elif ocr_option.lower() == "advanced":
-                # Advanced OCR using Tesseract via ImageMagick
-                tiff_output = self.input_pdf_path.replace('.pdf', '.tiff')
+                # Advanced OCR using Tesseract via ImageMagick and PyPDF2
 
-                # Convert PDF to high-quality TIFF using ImageMagick (change 'magick' to 'convert')
+                # Step 1: Convert PDF to images
+                output_image_pattern = self.input_pdf_path.replace('.pdf', '_page_%d.png')
                 cmd_convert = [
-                    'magick',
-                    '-density', '300',  # DPI
-                    '-depth', '8',  # Bit-depth
-                    '-background', 'white',
+                    'magick',  
+                    '-density', '300',  # High DPI for better OCR accuracy
                     self.input_pdf_path,
-                    tiff_output
+                    output_image_pattern
                 ]
-                print(f"Running command: {' '.join(cmd_convert)}")
+                print(f"Running ImageMagick command: {' '.join(cmd_convert)}")
                 subprocess.run(cmd_convert, check=True)
 
-                # Run Tesseract on the TIFF image
-                cmd_ocr = [
-                    'tesseract',
-                    tiff_output,
-                    self.outcome_pdf_path.replace('.pdf', ''),  # Output file name without extension
-                    '--oem', '1',  # Use the LSTM OCR Engine
-                    '--psm', '3',  # Page segmentation mode
-                    'pdf'
-                ]
-                print(f"Running command: {' '.join(cmd_ocr)}")
-                subprocess.run(cmd_ocr, check=True)
+                # Step 2: Apply OCR to images
+                ocr_output_files = []
+                for image_file in sorted(glob.glob(output_image_pattern.replace('%d', '*'))):
+                    ocr_output_pdf = image_file.replace('.png', '.pdf')
+                    cmd_ocr = [
+                        'tesseract',
+                        image_file,
+                        ocr_output_pdf.replace('.pdf', ''),  # Output file name without extension
+                        '--oem', '1',  # Use the LSTM OCR Engine
+                        '--psm', '3',  # Page segmentation mode
+                        'pdf'
+                    ]
+                    print(f"Running Tesseract OCR on: {image_file}")
+                    subprocess.run(cmd_ocr, check=True)
+                    ocr_output_files.append(ocr_output_pdf)
 
-                # Clean up TIFF file
-                # if os.path.exists(tiff_output):
-                    # os.remove(tiff_output)
+                # Step 3: Merge OCR'ed PDFs into a single output PDF
+                if ocr_output_files:
+                    self.merge_ocr_pdfs(ocr_output_files)
 
             else:
                 raise ValueError("Invalid OCR option provided.")
 
             print(f"OCR applied successfully using {ocr_option}. Output saved to {self.outcome_pdf_path}")
+            
+            # Once all processing is done, update the file status
+            self.update_status('Processed')  # Mark as processed
 
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e.cmd}")
         except Exception as e:
             print(f"Error processing {self.input_pdf_path} with {ocr_option} OCR: {e}")
+        finally:
+            gc.collect()
 
+    def merge_ocr_pdfs(self, ocr_pdf_files):
+        try:
+            merger = PdfMerger()
+            for pdf_file in ocr_pdf_files:
+                merger.append(pdf_file)
+
+            with open(self.outcome_pdf_path, 'wb') as f_out:
+                merger.write(f_out)
+            print(f"Final OCR'ed PDF saved as: {self.outcome_pdf_path}")
+        except Exception as e:
+            print(f"Error merging OCR'ed PDFs: {e}")
 
 
 def extract_bookmarks_to_dataframe(input_pdf):
@@ -240,12 +280,12 @@ def merge_pdf(ocr_files, output_dir, original_file_name):
     return final_pdf_path
 
 
-def apply_ocr_on_pdf(file_path, ocr_option="basic"):
+def apply_ocr_on_pdf(file_path, file_id, ocr_option="basic"):
     output_path = file_path.replace("uploads", "ocr_output")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Create a PDFManipulator instance
-    manipulator = PDFManipulator(file_path, output_path)
+    # Create a PDFManipulator instance with the file_id argument
+    manipulator = PDFManipulator(file_path, output_path, file_id)
 
     # Apply OCR based on the selected option
     manipulator.apply_ocr(ocr_option=ocr_option)

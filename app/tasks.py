@@ -1,11 +1,11 @@
-from celery import Celery, group, chain
+from celery import Celery, group, chain, chord
 from config import CeleryConfig
 from app.utils import extract_bookmarks_to_dataframe, reattach_bookmarks_from_dataframe, burst_pdf, merge_pdf, apply_ocr_on_pdf, session_scope, cleanup_tmp_dir
 from app.models import File
 from datetime import datetime
 import os
 import gc
-import fitz  # PyMuPDF
+import fitz 
 import pandas as pd
 
 
@@ -19,7 +19,7 @@ def ocr_pdf_file(file_id, ocr_option="basic"):
         file_entry = session.query(File).filter_by(id=file_id).first()
         if not file_entry:
             return
-        
+
         # Step 1: Extract bookmarks before processing and convert DataFrame to list of dicts
         bookmarks_df = extract_bookmarks_to_dataframe(file_entry.file_path)
         bookmarks_list = bookmarks_df.to_dict(orient='records')  # Convert DataFrame to list of dicts for serialization
@@ -29,19 +29,18 @@ def ocr_pdf_file(file_id, ocr_option="basic"):
         if not batch_files:
             return {"error": "Failed to burst the PDF", "file_path": file_entry.file_path}
 
-        # Step 3: Run OCR on each batch asynchronously, passing the OCR option to each batch task
-        ocr_tasks = group(
+        # Step 3: Create a group of OCR tasks
+        ocr_tasks = [
             ocr_pdf_page_batch.s(file_id, batch_file, start_page, end_page, ocr_option)
             for start_page, end_page, batch_file in batch_files
-        )
+        ]
 
-        # Chain the OCR tasks with the merge_ocr_batches task, passing bookmarks as a list of dicts
-        workflow = chain(
-            ocr_tasks,
-            merge_ocr_batches.s(file_id, bookmarks_list)
-        )
-        workflow.apply_async()
-
+        # Step 4: Use a chord to wait for all OCR tasks to finish before triggering merge_ocr_batches
+        callback = merge_ocr_batches.s(file_id, bookmarks_list)
+        
+        workflow = chord(ocr_tasks)(callback)
+        return workflow
+ 
 
 @celery.task
 def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page, ocr_option="basic"):
@@ -50,7 +49,7 @@ def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page, ocr_optio
             raise FileNotFoundError(f"Batch file not found: {batch_file_path}")
 
         # Step 4: Apply OCR to the batch file, passing the selected OCR option
-        ocr_file = apply_ocr_on_pdf(batch_file_path, ocr_option)
+        ocr_file = apply_ocr_on_pdf(batch_file_path, file_id, ocr_option)
         return {
             "start_page": start_page,
             "end_page": end_page,
@@ -58,7 +57,6 @@ def ocr_pdf_page_batch(file_id, batch_file_path, start_page, end_page, ocr_optio
         }
     except Exception as e:
         return {"error": str(e), "batch_file_path": batch_file_path}
-
 
 
 @celery.task
@@ -102,25 +100,10 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
                 
             # Step 10: Reattach the bookmarks to the final PDF
             reattach_bookmarks_from_dataframe(final_renamed_pdf_path, bookmarks_df, 1, total_pages)  #len(sorted_results))
-                
-            # Get the parent directory of the final PDF
-            parent_dir = os.path.dirname(final_renamed_pdf_path)
             
-            # Delete the file that ends with "_OCRed.pdf" and rename the one that ends with "_OCRed_with_bookmarks.pdf"
-            # by replacing "_OCRed_with_bookmarks.pdf" with "_OCRed.pdf"
-            
-            # for file in os.listdir(parent_dir):
-                # if file.endswith("_OCRed.pdf"):
-                    # os.remove(os.path.join(parent_dir, file))
-                # elif file.endswith("_OCRed_with_bookmarks.pdf"):
-                    # os.rename(os.path.join(parent_dir, file), os.path.join(parent_dir, file.replace("_OCRed_with_bookmarks.pdf", "_OCRed.pdf")))
-                    
-            # The final_renamed_pdf_path should be the path to the renamed file
-            # final_renamed_pdf_path = os.path.join(parent_dir, f"{os.path.splitext(file_entry.file_name)[0]}_OCRed.pdf")
-
             # Step 11: Update file entry status
             file_entry.output_path = final_renamed_pdf_path
-            file_entry.status = 'Processed'
+            # file_entry.status = 'Processed'
             file_entry.completed_at = datetime.utcnow()
             session.commit()
 

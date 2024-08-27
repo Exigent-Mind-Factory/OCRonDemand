@@ -16,8 +16,7 @@ from aiofiles import os as async_os
 from app.models import Project, File, Document
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
-from sqlalchemy import func  # Import func for case-insensitive comparison
-# from sanic.response import stream
+from sqlalchemy import func
 
 views_bp = Blueprint('views')
 
@@ -28,11 +27,6 @@ def get_user_from_request(request):
             user = session.query(User).filter_by(id=user_id).first()
             return user
     return None
-
-# @views_bp.route('/', methods=['GET'])
-# async def home(request):
-    # user = get_user_from_request(request)
-    # return request.app.ctx.jinja.render('home.html', request, user=user)
 
 @views_bp.route('/', methods=['GET'])
 async def home(request):
@@ -100,13 +94,13 @@ async def my_projects(request):
                     "status": file.status,
                     "download_url": f"/download/{file.id}" if file.status == "Processed" else None,
                     "error_url": f"/error/{file.id}" if file.status == "Failed" else None,
-                    "created_at": file.created_at.strftime('%Y-%m-%d %H:%M:%S')  # Convert to string
+                    "created_at": file.created_at.strftime('%Y-%m-%d %H:%M:%S')  
                 }
                 for file in project.files
             ]
             project_list.append({
                 "name": project.name,
-                "client_name": project.client.name,  # Get the client name
+                "client_name": project.client.name, 
                 "files": files
             })
         
@@ -198,9 +192,6 @@ async def upload_single_pdf_chunked(request):
     file_name = secure_filename(request.form.get('file_name'))
     chunk = request.files.get('chunk')
 
-    # Generate a unique UUID for this upload
-    
-
     # Save chunk to a temporary file
     temp_dir = os.path.join('uploads', str(user_id), str(client_id), str(project_id))   
     os.makedirs(temp_dir, exist_ok=True)
@@ -271,7 +262,6 @@ async def get_projects(request, client_id):
         projects = session.query(Project).filter_by(client_id=client_id).all()
         project_list = [{"id": project.id, "name": project.name} for project in projects]
         return response.json(project_list)
-
 
 
 @views_bp.route('/get_projects_by_client_name/<client_name>', methods=['GET'])
