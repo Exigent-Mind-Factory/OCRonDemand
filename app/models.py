@@ -46,27 +46,29 @@ class File(Base):
     file_name = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=False)
     file_metadata = Column(Text, nullable=True)
+    output_path = Column(String(255), nullable=True)
     file_path = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default='Not processed')
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
     uuid = Column(UUID(as_uuid=True), default=uuid_lib.uuid4, unique=True, nullable=False)
     project = relationship('Project', back_populates='files')    
     
 
-class Document(Base):
-    __tablename__ = 'documents'
-    id = Column(Integer, primary_key=True)
-    project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
-    file_name = Column(String(255), nullable=False)
-    file_path = Column(String(255), nullable=False)
-    output_path = Column(String(255), nullable=True)
-    status = Column(String(50), nullable=False, default='Pending')
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
-    project = relationship('Project', back_populates='documents')
+# class Document(Base):
+    # __tablename__ = 'documents'
+    # id = Column(Integer, primary_key=True)
+    # project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
+    # file_name = Column(String(255), nullable=False)
+    # file_path = Column(String(255), nullable=False)
+    # output_path = Column(String(255), nullable=True)
+    # status = Column(String(50), nullable=False, default='Pending')
+    # created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    # completed_at = Column(DateTime, nullable=True)
+    # project = relationship('Project', back_populates='documents')
 
 # Establish the back_populates relationship
 User.projects = relationship('Project', order_by=Project.id, back_populates='user')
 Client.projects = relationship('Project', order_by=Project.id, back_populates='client')
 Project.files = relationship('File', order_by=File.id, back_populates='project')
-Project.documents = relationship('Document', order_by=Document.id, back_populates='project')
+# Project.documents = relationship('Document', order_by=Document.id, back_populates='project')

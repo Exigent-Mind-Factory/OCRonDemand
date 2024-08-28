@@ -19,13 +19,20 @@ import gc
 from app.models import File
 from datetime import datetime
 
-
-
 # Import the User model from the models.py file
 from app.models import User
 
-# Setup logging to file
-logging.basicConfig(level=logging.DEBUG, filename='burst_pdf_debug.log')
+import logging
+
+# Configure logging to output to a file with debug level
+logging.basicConfig(
+    level=logging.DEBUG, 
+    filename='utils.log',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+logger = logging.getLogger(__name__)
+
 
 engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
@@ -66,14 +73,57 @@ class PDFManipulator:
             with open(self.outcome_pdf_path, 'wb') as output_file:
                 writer.write(output_file)
                 
+                
+    # def update_status(self, status):
+        # """Update the status of the file in the database"""
+        # try:
+            # with session_scope() as session:
+                # file_entry = session.query(File).filter_by(id=self.file_id).first()
+                # if file_entry:
+                    # file_entry.status = status
+                    # file_entry.completed_at = datetime.utcnow()
+                    # session.commit()
+        # except Exception as e:
+            # print(f"Failed to update status for file ID {self.file_id}: {e}")
+            
+
     def update_status(self, status):
         """Update the status of the file in the database"""
+        logger.info(f"Updating status for file_id: {self.file_id} to {status}")
         with session_scope() as session:
             file_entry = session.query(File).filter_by(id=self.file_id).first()
             if file_entry:
-                file_entry.status = status
-                file_entry.completed_at = datetime.utcnow()
-                session.commit()
+                try:
+                    file_entry.status = status
+                    file_entry.completed_at = datetime.utcnow()
+                    session.commit()
+                    logger.info(f"Status updated successfully for file_id: {self.file_id} to {status}")
+                except Exception as e:
+                    logger.error(f"Error updating status for file_id: {self.file_id}: {e}")
+                    session.rollback()
+            else:
+                logger.error(f"File with id: {self.file_id} not found")
+
+
+
+
+
+    # def update_status(self, status):
+        # """Update the status of the file in the database"""
+        # try:
+            # with session_scope() as session:
+                # file_entry = session.query(File).filter_by(id=self.file_id).first()
+                # if file_entry:
+                    # logger.info(f"Updating status for file ID {self.file_id} to {status}")
+                    # file_entry.status = status
+                    # file_entry.completed_at = datetime.utcnow()
+                    # session.commit()
+                    # logger.info(f"Status for file ID {self.file_id} updated to {status}")
+                # else:
+                    # logger.warning(f"File ID {self.file_id} not found")
+        # except Exception as e:
+            # logger.error(f"Failed to update status for file ID {self.file_id}: {e}")
+
 
     def apply_ocr(self, ocr_option="basic"):
         try:
@@ -93,7 +143,8 @@ class PDFManipulator:
                     self.outcome_pdf_path  # Output (OCR applied)
                 ]
                 print(f"Running command: {' '.join(cmd)}")
-                subprocess.run(cmd, check=True)
+                # subprocess.run(cmd, check=True)
+                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             elif ocr_option.lower() == "advanced":
                 # Advanced OCR using Tesseract via ImageMagick and PyPDF2
@@ -139,6 +190,11 @@ class PDFManipulator:
 
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e.cmd}")
+            print(f"Return code: {e.returncode}")
+            print(f"Error output: {e.stderr.decode()}")
+            print(f"Standard output: {e.stdout.decode()}")
+            self.update_status('Failed')
+            
         except Exception as e:
             print(f"Error processing {self.input_pdf_path} with {ocr_option} OCR: {e}")
         finally:
@@ -209,11 +265,11 @@ def reattach_bookmarks_from_dataframe(output_pdf, df_bookmarks, start_page, end_
     
     
 def burst_pdf(file_path):
-    logging.debug(f"Starting burst_pdf with file_path: {file_path}")
+    logger.debug(f"Starting burst_pdf with file_path: {file_path}")
     try:
         pdf_reader = PdfReader(open(file_path, 'rb'))
         total_pages = len(pdf_reader.pages)
-        logging.debug(f"Total pages in PDF: {total_pages}")
+        logger.debug(f"Total pages in PDF: {total_pages}")
         
         batch_size = 10  # Number of pages per batch
         parent_dir = os.path.dirname(file_path)
@@ -222,9 +278,9 @@ def burst_pdf(file_path):
         # Attempt to create the tmp directory
         try:
             os.makedirs(tmp_dir, exist_ok=True)
-            logging.debug(f"Created tmp directory at: {tmp_dir}")
+            logger.debug(f"Created tmp directory at: {tmp_dir}")
         except Exception as e:
-            logging.error(f"Failed to create tmp directory: {tmp_dir}. Error: {e}")
+            logger.error(f"Failed to create tmp directory: {tmp_dir}. Error: {e}")
             return []
 
         burst_files = []
@@ -237,27 +293,27 @@ def burst_pdf(file_path):
                 try:
                     pdf_writer.add_page(pdf_reader.pages[page])
                 except Exception as e:
-                    logging.error(f"Failed to add page {page} from {file_path}. Error: {e}")
+                    logger.error(f"Failed to add page {page} from {file_path}. Error: {e}")
                     continue
 
             batch_file_name = f"{os.path.splitext(os.path.basename(file_path))[0]}_pages_{start_page + 1}_to_{end_page}.pdf"
             batch_file_path = os.path.join(tmp_dir, batch_file_name)
-            logging.debug(f"Creating batch file: {batch_file_path}")
+            logger.debug(f"Creating batch file: {batch_file_path}")
             
             # Write the batch file
             try:
                 with open(batch_file_path, 'wb') as batch_file:
                     pdf_writer.write(batch_file)
                 burst_files.append((start_page + 1, end_page, batch_file_path))
-                logging.debug(f"Successfully created batch file: {batch_file_path}")
+                logger.debug(f"Successfully created batch file: {batch_file_path}")
             except Exception as e:
-                logging.error(f"Failed to write batch file {batch_file_path}. Error: {e}")
+                logger.error(f"Failed to write batch file {batch_file_path}. Error: {e}")
                 continue
 
         return burst_files
 
     except Exception as e:
-        logging.error(f"Failed to burst PDF {file_path}. Error: {e}")
+        logger.error(f"Failed to burst PDF {file_path}. Error: {e}")
         return []
 
 

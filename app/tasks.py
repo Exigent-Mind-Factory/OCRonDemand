@@ -102,10 +102,10 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
             reattach_bookmarks_from_dataframe(final_renamed_pdf_path, bookmarks_df, 1, total_pages)  #len(sorted_results))
             
             # Step 11: Update file entry status
-            file_entry.output_path = final_renamed_pdf_path
+            # file_entry.output_path = final_renamed_pdf_path
             # file_entry.status = 'Processed'
-            file_entry.completed_at = datetime.utcnow()
-            session.commit()
+            # file_entry.completed_at = datetime.utcnow()
+            # session.commit()
 
             # Cleanup temporary directory
             # tmp_dir = os.path.join(output_dir, 'tmp')

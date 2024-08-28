@@ -13,7 +13,7 @@ import shutil
 import aiofiles
 from aiofiles import os as async_os
 
-from app.models import Project, File, Document
+from app.models import Project, File
 from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -397,7 +397,7 @@ async def delete_projects(request):
         try:
             # Query and delete associated files and documents first
             files_query = session.query(File).filter(File.project_id.in_(project_ids)).all()
-            documents_query = session.query(Document).filter(Document.project_id.in_(project_ids)).all()
+            documents_query = session.query(File).filter(File.project_id.in_(project_ids)).all()
 
             # Delete associated files
             for file in files_query:
