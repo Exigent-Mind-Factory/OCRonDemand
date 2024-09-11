@@ -72,19 +72,6 @@ class PDFManipulator:
 
             with open(self.outcome_pdf_path, 'wb') as output_file:
                 writer.write(output_file)
-                
-                
-    # def update_status(self, status):
-        # """Update the status of the file in the database"""
-        # try:
-            # with session_scope() as session:
-                # file_entry = session.query(File).filter_by(id=self.file_id).first()
-                # if file_entry:
-                    # file_entry.status = status
-                    # file_entry.completed_at = datetime.utcnow()
-                    # session.commit()
-        # except Exception as e:
-            # print(f"Failed to update status for file ID {self.file_id}: {e}")
             
 
     def update_status(self, status):
@@ -103,26 +90,6 @@ class PDFManipulator:
                     session.rollback()
             else:
                 logger.error(f"File with id: {self.file_id} not found")
-
-
-
-
-
-    # def update_status(self, status):
-        # """Update the status of the file in the database"""
-        # try:
-            # with session_scope() as session:
-                # file_entry = session.query(File).filter_by(id=self.file_id).first()
-                # if file_entry:
-                    # logger.info(f"Updating status for file ID {self.file_id} to {status}")
-                    # file_entry.status = status
-                    # file_entry.completed_at = datetime.utcnow()
-                    # session.commit()
-                    # logger.info(f"Status for file ID {self.file_id} updated to {status}")
-                # else:
-                    # logger.warning(f"File ID {self.file_id} not found")
-        # except Exception as e:
-            # logger.error(f"Failed to update status for file ID {self.file_id}: {e}")
 
 
     def apply_ocr(self, ocr_option="basic"):
