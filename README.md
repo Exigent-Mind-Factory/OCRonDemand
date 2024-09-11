@@ -12,9 +12,11 @@
 
 ## Installation
 
-- The application runs in docker. Hence, simply run the following executable file to build the containers.
+- The application runs in docker. Hence, simply run the following executable files (in that order) to build the containers.
   ```
   ./launch.sh
+  ./run_migrations.sh
+  ./install_magick.sh
   ```
 
 ## Access and Usage
