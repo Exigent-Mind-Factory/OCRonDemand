@@ -121,3 +121,4 @@ wait-for-it.sh
 
 # Ignore ImageMagick directory
 ImageMagick/
+ImageMagick*
