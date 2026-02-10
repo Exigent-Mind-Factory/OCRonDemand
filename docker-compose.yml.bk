@@ -1,0 +1,71 @@
+services:
+  web:
+    build: .
+    command: ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- ./wait-for-it.sh redis:6379 --timeout=60 --strict -- python run.py
+    volumes:
+      - .:/app
+    ports:
+      - "8777:8777"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - PYTHONPATH=${PYTHONPATH}
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - ocrondemand_network
+
+  celery:
+    build: .
+    command: ./wait-for-it.sh postgres:5432 --timeout=60 --strict -- ./wait-for-it.sh redis:6379 --timeout=60 --strict -- celery -A app.tasks worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - PYTHONPATH=${PYTHONPATH}
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY}  # Pass concurrency setting to the Celery worker
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu] 
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - ocrondemand_network
+
+  redis:
+    image: redis:alpine
+    networks:
+      - ocrondemand_network
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ocrondemand_network
+
+
+
+volumes:
+  postgres_data:
+
+networks:
+  ocrondemand_network:
+    driver: bridge

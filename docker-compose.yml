@@ -5,13 +5,16 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8778:8778"
+      - "8777:8777"
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - SECRET_KEY=${SECRET_KEY}
       - PYTHONPATH=${PYTHONPATH}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
     depends_on:
       - redis
       - postgres
@@ -28,7 +31,10 @@ services:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
       - PYTHONPATH=${PYTHONPATH}
-      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY}  # Pass concurrency setting to the Celery worker
+      - CELERY_WORKER_CONCURRENCY=${CELERY_WORKER_CONCURRENCY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
     depends_on:
       - redis
       - postgres
@@ -57,3 +63,4 @@ volumes:
 networks:
   ocrondemand_network:
     driver: bridge
+

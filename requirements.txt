@@ -16,3 +16,5 @@ sanic-wtf
 aiofiles
 pymupdf
 pandas
+pdfservices-sdk
+python-docx

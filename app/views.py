@@ -18,6 +18,10 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.tasks import process_pdf_to_docx
+
+
+
 views_bp = Blueprint('views')
 
 def get_user_from_request(request):
@@ -35,9 +39,21 @@ async def home(request):
     return request.app.ctx.jinja.render('home.html', request, user=user, is_authenticated=is_authenticated)
 
 
+#@views_bp.route('/projects', methods=['GET'])
+#async def projects(request):
+#    user = get_user_from_request(request)
+#    is_authenticated = user is not None
+#    return request.app.ctx.jinja.render('projects.html', request, user=user, is_authenticated=is_authenticated)
+
+
 @views_bp.route('/projects', methods=['GET'])
 async def projects(request):
     user = get_user_from_request(request)
+    
+    # Check if user is authenticated
+    if not user:
+        return response.redirect('/login')  # Redirect to login page if not authenticated
+
     is_authenticated = user is not None
     return request.app.ctx.jinja.render('projects.html', request, user=user, is_authenticated=is_authenticated)
 
@@ -92,7 +108,10 @@ async def my_projects(request):
                     "id": file.id,
                     "name": file.file_name,
                     "status": file.status,
+                    "conversion_status": file.conversion_status,
                     "download_url": f"/download/{file.id}" if file.status == "Processed" else None,
+                    "docx_download_url": f"/download_docx/{file.id}" if file.conversion_status == "Completed" else None,
+                    "raw_docx_url": f"/download_raw_docx/{file.id}" if file.raw_docx_path else None,
                     "error_url": f"/error/{file.id}" if file.status == "Failed" else None,
                     "created_at": file.created_at.strftime('%Y-%m-%d %H:%M:%S')  
                 }
@@ -424,3 +443,76 @@ async def delete_projects(request):
             session.rollback()
             print(f"Error deleting projects: {e}")
             return response.json({'error': 'Failed to delete projects'}, status=500)
+
+
+@views_bp.route('/convert_to_docx/<file_id>', methods=['POST'])
+async def convert_to_docx(request, file_id):
+    with session_scope() as session:
+        file_entry = session.query(File).filter_by(id=file_id).first()
+        if not file_entry or file_entry.status != 'OCR Completed':
+            return response.json({'error': 'OCR must be completed before DOCX conversion'}, status=400)
+
+        file_entry.conversion_status = 'Processing'
+        session.commit()
+
+        # Start DOCX conversion task
+        task = process_pdf_to_docx.delay(file_entry.file_path, file_id)
+        return response.json({'message': 'DOCX conversion started', 'task_id': task.id})
+
+@views_bp.route('/docx_status/<task_id>', methods=['GET'])
+async def docx_status(request, task_id):
+    task_result = process_pdf_to_docx.AsyncResult(task_id)
+    if task_result.state == 'SUCCESS':
+        docx_path = task_result.result
+        return response.json({'status': 'completed', 'docx_path': docx_path})
+    elif task_result.state == 'PENDING':
+        return response.json({'status': 'processing'})
+    else:
+        return response.json({'status': 'failed'})
+
+@views_bp.route('/download_docx/<file_id:int>', methods=['GET'])
+async def download_docx(request, file_id):
+    with session_scope() as session:
+        file_entry = session.query(File).filter_by(id=file_id).first()
+        if not file_entry or not file_entry.docx_path:
+            return response.json({'error': 'DOCX file not found'}, status=404)
+
+        # Prepare headers for downloading the DOCX
+        file_stat = await async_os.stat(file_entry.docx_path)
+        headers = {
+            'Content-Disposition': f'attachment; filename="{os.path.basename(file_entry.docx_path)}"',
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Length': str(file_stat.st_size),
+        }
+
+        # Stream the DOCX file to the user
+        return await response.file_stream(
+            file_entry.docx_path,
+            chunk_size=8192,
+            headers=headers,
+        )
+
+
+
+
+@views_bp.route('/download_raw_docx/<file_id:int>', methods=['GET'])
+async def download_raw_docx(request, file_id):
+    with session_scope() as session:
+        file_entry = session.query(File).filter_by(id=file_id).first()
+        if not file_entry or not file_entry.raw_docx_path:
+            return response.json({'error': 'RAW DOCX file not found'}, status=404)
+
+        # Prepare headers for downloading the RAW DOCX
+        file_stat = await async_os.stat(file_entry.raw_docx_path)
+        headers = {
+            'Content-Disposition': f'attachment; filename="{os.path.basename(file_entry.raw_docx_path)}"',
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Length': str(file_stat.st_size),
+        }
+
+        # Stream the RAW DOCX file to the user
+        return await response.file_stream(
+            file_entry.raw_docx_path,
+            chunk_size=8192,
+            headers=headers,
+        )

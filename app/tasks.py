@@ -7,7 +7,12 @@ import os
 import gc
 import fitz 
 import pandas as pd
+from docx import Document
 
+from app.utils import split_pdf, merge_docx_files, cleanup_temp_files, process_in_batches
+
+import time
+import logging
 
 celery = Celery('ocr_tasks')
 celery.config_from_object(CeleryConfig)
@@ -111,6 +116,10 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
             # tmp_dir = os.path.join(output_dir, 'tmp')
             # cleanup_tmp_dir(tmp_dir)
 
+            # Trigger DOCX conversion after OCR completion
+            process_pdf_to_docx.delay(final_renamed_pdf_path, file_id)
+
+
         except KeyError as e:
             print(f"Error merging PDFs: missing key {e}")
         except Exception as e:
@@ -122,3 +131,119 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
 @celery.task
 def ocr_pdf_folder(folder_path, project_id):
     pass
+
+
+
+MAX_REQUESTS_PER_BATCH = 20
+BATCH_COOLDOWN = 30  # Cooldown period in seconds
+
+
+@celery.task
+def process_pdf_to_docx(file_path, file_id):
+    """Converts an OCR’ed PDF to DOCX and updates the database record."""
+
+    # Start DOCX conversion and set status to 'Processing'
+    with session_scope() as session:
+        file_entry = session.query(File).filter_by(id=file_id).first()
+        if not file_entry:
+            return
+        file_entry.conversion_status = 'Processing'
+        session.commit()
+
+    try:
+        # Step 1: Split the PDF into chunks for batch processing
+
+        # Instead of taking the OCR'ed document, take the original PDF before OCR.
+        file_path = file_path.split("_OCRed")[0] + ".pdf"
+
+        chunk_paths = split_pdf(file_path, pages_per_chunk=20)
+
+        # Step 2: Convert each chunk to DOCX and process in batches
+        docx_paths = process_in_batches(chunk_paths)
+
+        # Step 3: Merge all DOCX chunks into a single DOCX file
+        output_dir = os.path.dirname(file_path)
+        output_file_path = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(file_path))[0]}_OCRed.docx")
+        merge_docx_files(docx_paths, output_file_path)
+
+        # Update the database with the conversion status and DOCX path
+        with session_scope() as session:
+            file_entry = session.query(File).filter_by(id=file_id).first()
+            if file_entry:
+                file_entry.docx_path = output_file_path
+                file_entry.conversion_status = 'Completed'  # Set to Completed after successful DOCX conversion
+                session.commit()
+
+
+        # Trigger RAW DOCX creation once DOCX conversion completes
+        generate_raw_docx.delay(file_id)
+
+        return output_file_path
+
+    except Exception as e:
+        # Update conversion status to 'Failed' in case of an error
+        print(f"The conversion of the OCR'ed PDF to DOCX failed!")
+        logging.info(f"The conversion of the OCR'ed PDF to DOCX failed: {e}")
+
+        with session_scope() as session:
+            file_entry = session.query(File).filter_by(id=file_id).first()
+            if file_entry:
+                file_entry.conversion_status = 'Failed'
+                session.commit()
+        raise e
+
+
+
+
+@celery.task
+def generate_raw_docx(file_id):
+    """Generate a raw DOCX with no formatting from the converted DOCX."""
+    with session_scope() as session:
+        file_entry = session.query(File).filter_by(id=file_id).first()
+        if not file_entry or not file_entry.docx_path:
+            return None  # If no converted DOCX exists, exit
+
+        # Define path for the raw DOCX
+        output_dir = os.path.dirname(file_entry.docx_path)
+        raw_docx_path = os.path.join(output_dir, f"{os.path.splitext(file_entry.file_name)[0]}_RAW.docx")
+
+        # Load the converted DOCX
+        original_doc = Document(file_entry.docx_path)
+        raw_doc = Document()  # Create a new blank DOCX
+
+        # Extract text without any formatting and add it to the new document
+        # for para in original_doc.paragraphs:
+            # raw_doc.add_paragraph(para.text)
+
+        # for para in original_doc.paragraphs:
+            # if para.text.strip():  # Check if the paragraph has non-blank text
+                # raw_doc.add_paragraph(para.text)
+
+        for para in original_doc.paragraphs:
+            if para.text.strip():  # Check if the paragraph has non-blank text
+                # Add a plain paragraph without any styling
+                new_para = raw_doc.add_paragraph(para.text)
+
+                # Remove any potential numbering or indentation by resetting paragraph formatting
+                new_para.paragraph_format.left_indent = None
+                new_para.paragraph_format.right_indent = None
+                new_para.paragraph_format.first_line_indent = None
+                new_para.paragraph_format.space_before = None
+                new_para.paragraph_format.space_after = None
+                new_para.paragraph_format.alignment = None
+        
+                # Ensure no text is bolded or italicized
+                for run in new_para.runs:
+                    run.bold = False
+                    run.italic = False
+                    run.underline = False
+
+        # Save the raw DOCX
+        raw_doc.save(raw_docx_path)
+
+        # Update file entry with raw_docx path
+        file_entry.raw_docx_path = raw_docx_path  # You might need to add this column in your model
+        session.commit()
+
+    return raw_docx_path
+

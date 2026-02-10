@@ -47,6 +47,7 @@
                       </select>
                       entries
                   </div>
+                  <button id="clear-table-btn" class="btn btn-danger">Clear Table</button>
               </div>
               <div class="table-responsive" style="min-height: 60vh">
                   <table class="table table-bordered" id="projects-table">
@@ -164,42 +165,42 @@
     // Populate clients on page load
     populateClients();
 
-    
+
     // Debug: Create Project button submission handler
     document.getElementById('create-project-form').addEventListener('submit', async function(event) {
         event.preventDefault();
         console.log('Create Project button clicked.');
-    
+
         let clientName = document.getElementById('client_name').value.trim();
         let newClientName = document.getElementById('new_client_name').value.trim();
         let projectName = document.getElementById('project_name').value.trim();
         let newProjectName = document.getElementById('new_project_name').value.trim();
-    
+
         if (!clientName && !newClientName) {
             alert('Please select a client from the dropdown or enter a new client name.');
             console.log('Client name missing.');
             return;
         }
-    
+
         if (!projectName && !newProjectName) {
             alert('Please select a project from the dropdown or enter a new project name.');
             console.log('Project name missing.');
             return;
         }
-    
+
         if (newClientName) clientName = newClientName;
         if (newProjectName) projectName = newProjectName;
-    
+
         const formData = { client_name: clientName, project_name: projectName };
         console.log('Form data prepared:', formData);
-    
+
         try {
             const response = await fetch('/create_project', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
-    
+
             if (response.ok) {
                 const data = await response.json();
                 console.log('Project created successfully:', data);
@@ -215,7 +216,7 @@
             alert('An unexpected error occurred. Please try again.');
         }
     });
-    
+
 
 
     function attachButtonListeners() {
@@ -225,7 +226,7 @@
             });
         });
     }
-    
+
 
     // Pagination function
     function paginateTable() {
@@ -258,31 +259,72 @@
     }
 
     // Sorting function
+    // function sortTable(columnIndex) {
+    //    if (currentSortColumn === columnIndex) {
+    //        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    //    } else {
+    //        currentSortDirection = 'asc';
+    //    }
+
+    //    currentSortColumn = columnIndex;
+    //    allRows.sort((a, b) => {
+    //        const x = a.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+    //        const y = b.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
+
+    //        if (columnIndex === 4) {
+    //            return currentSortDirection === 'asc' ? (new Date(x) - new Date(y)) : (new Date(y) - new Date(x));
+    //        }
+
+    //        return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+    //    });
+
+    //    paginateTable();
+    // }
+
     function sortTable(columnIndex) {
         if (currentSortColumn === columnIndex) {
             currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
         } else {
-            currentSortDirection = 'asc';
+            currentSortDirection = 'desc';  // Default: newest first
         }
-
+    
         currentSortColumn = columnIndex;
+    
         allRows.sort((a, b) => {
             const x = a.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
             const y = b.querySelectorAll('td')[columnIndex].textContent.toLowerCase();
-
-            if (columnIndex === 4) {
+    
+            // Sort by date (column index 3 = "Date Uploaded")
+            if (columnIndex === 3) {
                 return currentSortDirection === 'asc' ? (new Date(x) - new Date(y)) : (new Date(y) - new Date(x));
             }
-
+    
             return currentSortDirection === 'asc' ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
         });
-
+    
         paginateTable();
     }
+    
 
+    let tableCleared = false;  // Flag to track if table was manually cleared
+
+    // Function to clear the table
+    document.getElementById('clear-table-btn').addEventListener('click', function () {
+        document.getElementById('projects-list').innerHTML = '';  // Clear table body
+        allRows = [];  // Clear row tracking
+        updatePaginationControls();  // Update pagination after clearing
+        tableCleared = true;  // Set flag to prevent polling from repopulating
+    });
+    
 
     // Load projects from the server
     async function loadProjects() {
+
+        if (tableCleared) {
+            tableCleared = false;  // Reset the flag
+            return;  // Skip reloading if table was manually cleared
+        }
+
         const response = await fetch('/my_projects');
         const projects = await response.json();
     
@@ -300,7 +342,10 @@
                     <td>${new Date(file.created_at).toLocaleString()}</td>
                     <td id="status-${file.id}">${file.status}</td>
                     <td id="action-${file.id}">
-                        ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download</a>` : ''}
+                        ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download PDF</a>` : ''}
+                ${file.conversion_status === 'Completed' ? `<a href="${file.docx_download_url}" class="btn btn-primary btn-sm">Download DOCX</a>` : ''}
+                        ${file.raw_docx_url ? `<a href="${file.raw_docx_url}" class="btn btn-warning btn-sm">Download RAW DOCX</a>` : ''}
+    
                         ${file.status === 'Not processed' ? `
                             <div class="form-group">
                                 <label for="ocr_option-${file.id}">OCR Option:</label>
@@ -310,10 +355,13 @@
                                 </select>
                             </div>
                             <button class="btn btn-warning btn-sm" data-file-id="${file.id}" onclick="startOcrProcess(${file.id})">Start OCR</button>` : ''}
-                        ${file.status === 'Processing' ? `<div class="progress mt-3" style="height: 20px;">
-                                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
-                                                        </div>` : ''}
-                        ${file.status === 'Failed' ? `<button class="btn btn-danger btn-sm">Show Error</button>` : ''}
+    
+                        ${file.status === 'Processing' || file.conversion_status === 'Processing' ? `
+                            <div class="progress mt-3" style="height: 20px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                            </div>` : ''}
+    
+                        ${(file.status === 'Failed' || file.conversion_status === 'Failed') ? `<button class="btn btn-danger btn-sm">Show Error</button>` : ''}
                     </td>
                 `;
                 projectsList.appendChild(row);
@@ -324,40 +372,52 @@
         paginateTable();
         attachButtonListeners();  // Attach button listeners for newly loaded rows
     }
-    
-    // Start OCR process function
-    async function startOcrProcess(fileId) {
-        const ocrOption = document.getElementById(`ocr_option-${fileId}`).value;
-        
-        try {
-            const response = await fetch(`/start_ocr/${fileId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ocr_option: ocrOption })
-            });
-    
-            if (response.ok) {
-                const statusElement = document.getElementById(`status-${fileId}`);
-                const actionElement = document.getElementById(`action-${fileId}`);
-    
-                statusElement.innerText = 'Processing';
-                actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
-                                        </div>`;
-            } else {
-                alert('Error: Unable to start OCR.');
-            }
-        } catch (error) {
-            alert('An unexpected error occurred. Please try again.');
+
+    // Polling for status updates every 10 seconds
+    setInterval(() => {
+        if (!tableCleared) {
+            loadProjects();
         }
-    }
+    }, 10000);  // Only reload the project list if table hasn't been cleared
     
-
-
-
-    loadProjects();  // Load projects on page load
-
-    // Poll for status updates every 10 seconds
-    setInterval(loadProjects, 10000);  // Reload the project list every 10 seconds for updates
+    
+    // Polling for status updates every 10 seconds
+    // setInterval(loadProjects, 10000);  // Reload the project list every 10 seconds for updates
+    
+    
+        // Start OCR process function
+        async function startOcrProcess(fileId) {
+            const ocrOption = document.getElementById(`ocr_option-${fileId}`).value;
+    
+            try {
+                const response = await fetch(`/start_ocr/${fileId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ocr_option: ocrOption })
+                });
+    
+                if (response.ok) {
+                    const statusElement = document.getElementById(`status-${fileId}`);
+                    const actionElement = document.getElementById(`action-${fileId}`);
+    
+                    statusElement.innerText = 'Processing';
+                    actionElement.innerHTML = `<div class="progress mt-3" style="height: 20px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;">Processing...</div>
+                                            </div>`;
+                } else {
+                    alert('Error: Unable to start OCR.');
+                }
+            } catch (error) {
+                alert('An unexpected error occurred. Please try again.');
+            }
+        }
+    
+    
+    
+    
+        loadProjects();  // Load projects on page load
+    
+        // Poll for status updates every 10 seconds
+        setInterval(loadProjects, 10000);  // Reload the project list every 10 seconds for updates
 </script>
 {% endblock %}

@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Path to the Docker Compose file (update as needed)
+DOCKER_COMPOSE_PATH="/home/production/OCRonDemand/docker-compose.yml"
+
+# Name of the Docker Compose project (if any)
+COMPOSE_PROJECT_NAME="OCRonDemand"
+
+# Function to check if a container is running
+check_containers() {
+    echo "Checking container statuses..."
+    ALL_RUNNING=true
+    # List all containers in the project
+    CONTAINERS=$(docker ps -a --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Names}}")
+
+    if [ -z "$CONTAINERS" ]; then
+        echo "No containers found for project $COMPOSE_PROJECT_NAME."
+        return 1
+    fi
+
+    for CONTAINER in $CONTAINERS; do
+        STATUS=$(docker inspect -f '{{.State.Running}}' "$CONTAINER")
+        if [ "$STATUS" != "true" ]; then
+            echo "Container $CONTAINER is down. Restarting..."
+            docker start "$CONTAINER"
+            ALL_RUNNING=false
+        else
+            echo "Container $CONTAINER is running."
+        fi
+    done
+
+    if $ALL_RUNNING; then
+        echo "All containers are running."
+    else
+        echo "Some containers were restarted."
+    fi
+}
+
+# Function to restart the entire stack if necessary
+restart_stack() {
+    echo "Restarting the entire Docker Compose stack..."
+    docker-compose -f "$DOCKER_COMPOSE_PATH" up -d
+}
+
+# Main function
+main() {
+    if ! docker info > /dev/null 2>&1; then
+        echo "Docker is not running. Attempting to start Docker..."
+        systemctl start docker
+    fi
+
+    check_containers
+
+    # Verify if any containers are still down after individual restarts
+    DOWN_CONTAINERS=$(docker ps -a --filter "status=exited" --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Names}}")
+    if [ ! -z "$DOWN_CONTAINERS" ]; then
+        echo "Some containers are still down. Restarting the entire stack..."
+        restart_stack
+    else
+        echo "All containers are running after checks."
+    fi
+
+    echo "Check completed."
+}
+
+# Run the main function
+main
+

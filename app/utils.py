@@ -22,6 +22,25 @@ from datetime import datetime
 # Import the User model from the models.py file
 from app.models import User
 
+import time
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+from adobe.pdfservices.operation.pdf_services import PDFServices
+from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
+from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
+from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
+from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
+from docx import Document
+
+from dotenv import load_dotenv
+
+
+# Load environment variables
+load_dotenv('.env')
+
+
 import logging
 
 # Configure logging to output to a file with debug level
@@ -352,3 +371,133 @@ def apply_ocr_on_pdf(file_path, file_id, ocr_option="basic"):
 def cleanup_tmp_dir(tmp_dir):
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
+
+
+credentials = ServicePrincipalCredentials(
+    client_id=os.getenv('PDF_SERVICES_CLIENT_ID'),
+    client_secret=os.getenv('PDF_SERVICES_CLIENT_SECRET')
+)
+pdf_services = PDFServices(credentials=credentials)
+
+MAX_REQUESTS_PER_BATCH = 5
+BATCH_COOLDOWN = 60
+
+#def split_pdf(file_path, pages_per_chunk=5):
+#    pdf_reader = PdfReader(file_path)
+#    chunk_paths = []
+#    for i in range(0, len(pdf_reader.pages), pages_per_chunk):
+#        pdf_writer = PdfWriter()
+#        for page in pdf_reader.pages[i:i + pages_per_chunk]:
+#            pdf_writer.add_page(page)
+#        chunk_path = f"{os.path.dirname(file_path)}/chunk_{i // pages_per_chunk}.pdf"
+#        with open(chunk_path, "wb") as chunk_file:
+#            pdf_writer.write(chunk_file)
+#        chunk_paths.append(chunk_path)
+#    return chunk_paths
+
+
+def split_pdf(file_path, pages_per_chunk=5):
+    pdf_reader = PdfReader(file_path)
+    chunk_paths = []
+    
+    for i, start in enumerate(range(0, len(pdf_reader.pages), pages_per_chunk)):
+        pdf_writer = PdfWriter()
+        for page in pdf_reader.pages[start:start + pages_per_chunk]:
+            pdf_writer.add_page(page)
+        
+        chunk_path = f"{os.path.dirname(file_path)}/chunk_{i}.pdf"
+        with open(chunk_path, "wb") as chunk_file:
+            pdf_writer.write(chunk_file)
+        
+        chunk_paths.append((i, chunk_path))  # Store index for ordering later
+
+    return chunk_paths  # Return list of (index, file_path)
+
+
+
+def convert_pdf_chunk_to_docx(pdf_chunk_path):
+    try:
+        with open(pdf_chunk_path, 'rb') as file:
+            input_stream = file.read()
+        input_asset = pdf_services.upload(input_stream=input_stream, mime_type=PDFServicesMediaType.PDF)
+        export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat.DOCX)
+        export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
+        
+        location = pdf_services.submit(export_pdf_job)
+        pdf_services_response = pdf_services.get_job_result(location, ExportPDFResult)
+        result_asset = pdf_services_response.get_result().get_asset()
+        stream_asset = pdf_services.get_content(result_asset)
+
+        output_path = pdf_chunk_path.replace('.pdf', '.docx')
+        with open(output_path, "wb") as docx_file:
+            docx_file.write(stream_asset.get_input_stream())
+        
+        return output_path
+
+    except Exception:
+        time.sleep(BATCH_COOLDOWN)
+        return convert_pdf_chunk_to_docx(pdf_chunk_path)
+
+# def process_in_batches(chunk_paths, batch_size=MAX_REQUESTS_PER_BATCH):
+#    docx_paths = []
+#    for i in range(0, len(chunk_paths), batch_size):
+#        batch = chunk_paths[i:i + batch_size]
+#        with ThreadPoolExecutor() as executor:
+#            futures = {executor.submit(convert_pdf_chunk_to_docx, path): path for path in batch}
+#            for future in as_completed(futures):
+#                result = future.result()
+#                if result:
+#                    docx_paths.append(result)
+#        time.sleep(BATCH_COOLDOWN)
+#    return docx_paths
+
+
+
+def process_in_batches(chunk_paths, batch_size=MAX_REQUESTS_PER_BATCH):
+    docx_map = {}  # Dictionary to map original order -> converted file
+    for i in range(0, len(chunk_paths), batch_size):
+        batch = chunk_paths[i:i + batch_size]
+
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(convert_pdf_chunk_to_docx, path): (index, path) for index, path in batch}
+
+            for future in as_completed(futures):
+                index, original_path = futures[future]
+                result = future.result()
+                if result:
+                    docx_map[index] = result  # Store in map with index as key
+
+        time.sleep(BATCH_COOLDOWN)
+
+    # Sort results based on original chunk order
+    ordered_docx_paths = [docx_map[i] for i in sorted(docx_map.keys())]
+    return ordered_docx_paths
+
+
+
+
+
+def merge_docx_files(docx_paths, output_path):
+    merged_document = Document(docx_paths[0])
+    for docx_path in docx_paths[1:]:
+        sub_doc = Document(docx_path)
+        for element in sub_doc.element.body:
+            merged_document.element.body.append(element)
+    merged_document.save(output_path)
+
+
+
+#def merge_docx_files(docx_paths, output_path):
+#    merged_document = Document(docx_paths[0])
+#    for docx_path in reversed(docx_paths[1:]):  # Reverse the order of merging
+#        sub_doc = Document(docx_path)
+#        for element in sub_doc.element.body:
+#            merged_document.element.body.append(element)
+#    merged_document.save(output_path)
+
+
+
+def cleanup_temp_files(file_paths):
+    """Delete temporary files."""
+    for path in file_paths:
+        os.remove(path)

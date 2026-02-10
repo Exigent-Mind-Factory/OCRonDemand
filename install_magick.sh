@@ -12,7 +12,7 @@ fi
 # Step 2: Remove any existing ImageMagick directory and ensure it's deleted
 echo "Removing any existing ImageMagick directory..."
 docker exec $container_name bash -c "
-    rm -rf /app/ImageMagick /app/ImageMagick-7.1.1-37 /app/ImageMagick.tar.gz &&
+    rm -rf /app/ImageMagick /app/ImageMagick-7.1.1-43 /app/ImageMagick.tar.gz &&
     echo 'ImageMagick directory cleared.'"
 
 # Step 3: Install dependencies
@@ -26,15 +26,15 @@ docker exec $container_name bash -c "
 echo "Downloading ImageMagick source..."
 docker exec $container_name bash -c "
     cd /app &&
-    wget https://imagemagick.org/download/releases/ImageMagick-7.1.1-37.tar.gz &&
-    tar xvzf ImageMagick-7.1.1-37.tar.gz &&
-    cd ImageMagick-7.1.1-37 &&
+    wget https://imagemagick.org/download/releases/ImageMagick-7.1.1-43.tar.gz &&
+    tar xvzf ImageMagick-7.1.1-43.tar.gz &&
+    cd ImageMagick-7.1.1-43 &&
     echo 'ImageMagick source downloaded and extracted.'"
 
 # Step 5: Configure, compile, and install ImageMagick
 echo "Configuring, compiling, and installing ImageMagick..."
 docker exec $container_name bash -c "
-    cd /app/ImageMagick-7.1.1-37 &&
+    cd /app/ImageMagick-7.1.1-43 &&
     ./configure &&
     make -j$(nproc) &&
     make install &&
