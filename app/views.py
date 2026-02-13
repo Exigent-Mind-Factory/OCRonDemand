@@ -452,6 +452,69 @@ async def delete_projects(request):
             return response.json({'error': 'Failed to delete projects'}, status=500)
 
 
+@views_bp.route('/clear_all_files', methods=['POST'])
+async def clear_all_files(request):
+    """Delete all files for the current user from uploads/, ocr_output/ and database."""
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return response.json({'error': 'You must be logged in to perform this action'}, status=403)
+
+    with session_scope() as session:
+        try:
+            # Get all projects belonging to this user
+            user_projects = session.query(Project).filter_by(user_id=user_id).all()
+            project_ids = [p.id for p in user_projects]
+
+            if not project_ids:
+                return response.json({'message': 'No files to delete'}, status=200)
+
+            # Get all files for these projects
+            files = session.query(File).filter(File.project_id.in_(project_ids)).all()
+
+            # Delete physical files and directories
+            for file in files:
+                # Delete original uploaded file and its directory
+                if file.file_path and os.path.exists(file.file_path):
+                    file_dir = os.path.dirname(file.file_path)
+                    if os.path.exists(file_dir):
+                        shutil.rmtree(file_dir, ignore_errors=True)
+
+                # Delete OCR output file and its directory
+                if file.output_path and os.path.exists(file.output_path):
+                    output_dir = os.path.dirname(file.output_path)
+                    if os.path.exists(output_dir):
+                        shutil.rmtree(output_dir, ignore_errors=True)
+
+                # Delete DOCX file if exists
+                if file.docx_path and os.path.exists(file.docx_path):
+                    os.remove(file.docx_path)
+
+                # Delete raw DOCX file if exists
+                if file.raw_docx_path and os.path.exists(file.raw_docx_path):
+                    os.remove(file.raw_docx_path)
+
+                # Delete file record from database
+                session.delete(file)
+
+            # Also clean up user's upload and ocr_output directories
+            user_upload_dir = os.path.join('uploads', str(user_id))
+            if os.path.exists(user_upload_dir):
+                shutil.rmtree(user_upload_dir, ignore_errors=True)
+
+            user_ocr_output_dir = os.path.join('ocr_output', str(user_id))
+            if os.path.exists(user_ocr_output_dir):
+                shutil.rmtree(user_ocr_output_dir, ignore_errors=True)
+
+            session.commit()
+
+            return response.json({'message': 'All files deleted successfully'}, status=200)
+
+        except Exception as e:
+            session.rollback()
+            print(f"Error clearing files: {e}")
+            return response.json({'error': 'Failed to delete files'}, status=500)
+
+
 @views_bp.route('/convert_to_docx/<file_id>', methods=['POST'])
 async def convert_to_docx(request, file_id):
     with session_scope() as session:
