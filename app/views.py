@@ -109,7 +109,7 @@ async def my_projects(request):
                     "name": file.file_name,
                     "status": file.status,
                     "conversion_status": file.conversion_status,
-                    "download_url": f"/download/{file.id}" if file.status == "Processed" else None,
+                    "download_url": f"/download/{file.id}" if file.status in ("Processed", "OCR Completed") else None,
                     "docx_download_url": f"/download_docx/{file.id}" if file.conversion_status == "Completed" else None,
                     "raw_docx_url": f"/download_raw_docx/{file.id}" if file.raw_docx_path else None,
                     "error_url": f"/error/{file.id}" if file.status == "Failed" else None,
