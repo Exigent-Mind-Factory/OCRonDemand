@@ -93,18 +93,6 @@ class PDFManipulator:
                 writer.write(output_file)
                 
                 
-    # def update_status(self, status):
-        # """Update the status of the file in the database"""
-        # try:
-            # with session_scope() as session:
-                # file_entry = session.query(File).filter_by(id=self.file_id).first()
-                # if file_entry:
-                    # file_entry.status = status
-                    # file_entry.completed_at = datetime.utcnow()
-                    # session.commit()
-        # except Exception as e:
-            # print(f"Failed to update status for file ID {self.file_id}: {e}")
-            
 
     def update_status(self, status):
         """Update the status of the file in the database"""
@@ -123,25 +111,6 @@ class PDFManipulator:
             else:
                 logger.error(f"File with id: {self.file_id} not found")
 
-
-
-
-
-    # def update_status(self, status):
-        # """Update the status of the file in the database"""
-        # try:
-            # with session_scope() as session:
-                # file_entry = session.query(File).filter_by(id=self.file_id).first()
-                # if file_entry:
-                    # logger.info(f"Updating status for file ID {self.file_id} to {status}")
-                    # file_entry.status = status
-                    # file_entry.completed_at = datetime.utcnow()
-                    # session.commit()
-                    # logger.info(f"Status for file ID {self.file_id} updated to {status}")
-                # else:
-                    # logger.warning(f"File ID {self.file_id} not found")
-        # except Exception as e:
-            # logger.error(f"Failed to update status for file ID {self.file_id}: {e}")
 
 
     def apply_ocr(self, ocr_option="basic"):
@@ -170,14 +139,27 @@ class PDFManipulator:
 
                 # Step 1: Convert PDF to images
                 output_image_pattern = self.input_pdf_path.replace('.pdf', '_page_%d.png')
+                #cmd_convert = [
+                #    'magick',  
+                #    '-density', '300',  # High DPI for better OCR accuracy
+                #    self.input_pdf_path,
+                #    output_image_pattern
+                #]
+
                 cmd_convert = [
-                    'magick',  
-                    '-density', '300',  # High DPI for better OCR accuracy
-                    self.input_pdf_path,
-                    output_image_pattern
+                    'magick',
+                    '-limit', 'disk', '16GiB',
+                    '-limit', 'map', '4GiB',
+                    '-limit', 'memory', '2GiB',
+                    '-density', '300',
+                    self.outcome_pdf_path,
+                    self.outcome_pdf_path
                 ]
+
                 print(f"Running ImageMagick command: {' '.join(cmd_convert)}")
-                subprocess.run(cmd_convert, check=True)
+                # subprocess.run(cmd_convert, check=True)
+                subprocess.run(cmd_convert, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
 
                 # Step 2: Apply OCR to images
                 ocr_output_files = []
@@ -192,7 +174,10 @@ class PDFManipulator:
                         'pdf'
                     ]
                     print(f"Running Tesseract OCR on: {image_file}")
-                    subprocess.run(cmd_ocr, check=True)
+                    
+                    # subprocess.run(cmd_ocr, check=True)
+                    subprocess.run(cmd_convert, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
                     ocr_output_files.append(ocr_output_pdf)
 
                 # Step 3: Merge OCR'ed PDFs into a single output PDF
@@ -210,8 +195,13 @@ class PDFManipulator:
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e.cmd}")
             print(f"Return code: {e.returncode}")
-            print(f"Error output: {e.stderr.decode()}")
-            print(f"Standard output: {e.stdout.decode()}")
+            # print(f"Error output: {e.stderr.decode()}")
+            # print(f"Standard output: {e.stdout.decode()}")
+            err = (e.stderr.decode(errors="replace") if e.stderr else "")
+            out = (e.stdout.decode(errors="replace") if e.stdout else "")
+            print(f"Error output: {err}")
+            print(f"Standard output: {out}")
+
             self.update_status('Failed')
             
         except Exception as e:
@@ -382,19 +372,6 @@ pdf_services = PDFServices(credentials=credentials)
 MAX_REQUESTS_PER_BATCH = 5
 BATCH_COOLDOWN = 60
 
-#def split_pdf(file_path, pages_per_chunk=5):
-#    pdf_reader = PdfReader(file_path)
-#    chunk_paths = []
-#    for i in range(0, len(pdf_reader.pages), pages_per_chunk):
-#        pdf_writer = PdfWriter()
-#        for page in pdf_reader.pages[i:i + pages_per_chunk]:
-#            pdf_writer.add_page(page)
-#        chunk_path = f"{os.path.dirname(file_path)}/chunk_{i // pages_per_chunk}.pdf"
-#        with open(chunk_path, "wb") as chunk_file:
-#            pdf_writer.write(chunk_file)
-#        chunk_paths.append(chunk_path)
-#    return chunk_paths
-
 
 def split_pdf(file_path, pages_per_chunk=5):
     pdf_reader = PdfReader(file_path)
@@ -437,20 +414,6 @@ def convert_pdf_chunk_to_docx(pdf_chunk_path):
     except Exception:
         time.sleep(BATCH_COOLDOWN)
         return convert_pdf_chunk_to_docx(pdf_chunk_path)
-
-# def process_in_batches(chunk_paths, batch_size=MAX_REQUESTS_PER_BATCH):
-#    docx_paths = []
-#    for i in range(0, len(chunk_paths), batch_size):
-#        batch = chunk_paths[i:i + batch_size]
-#        with ThreadPoolExecutor() as executor:
-#            futures = {executor.submit(convert_pdf_chunk_to_docx, path): path for path in batch}
-#            for future in as_completed(futures):
-#                result = future.result()
-#                if result:
-#                    docx_paths.append(result)
-#        time.sleep(BATCH_COOLDOWN)
-#    return docx_paths
-
 
 
 def process_in_batches(chunk_paths, batch_size=MAX_REQUESTS_PER_BATCH):

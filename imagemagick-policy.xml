@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policymap PUBLIC "-//ImageMagick//DTD policymap//EN" "http://www.imagemagick.org/schema/policy.dtd">
+<policymap>
+  <!-- Increase cache limits so -density 300 doesn't exhaust pixel cache -->
+  <policy domain="resource" name="disk" value="16GiB"/>
+  <policy domain="resource" name="map" value="4GiB"/>
+  <policy domain="resource" name="memory" value="2GiB"/>
+  <policy domain="resource" name="area" value="512MP"/>
+
+  <!-- Keep existing security restrictions -->
+  <policy domain="path" rights="none" pattern="@*"/>
+  <policy domain="delegate" rights="none" pattern="URL"/>
+  <policy domain="delegate" rights="none" pattern="HTTPS"/>
+  <policy domain="delegate" rights="none" pattern="HTTP"/>
+</policymap>
