@@ -303,11 +303,18 @@ async def get_projects_by_client_name(request, client_name):
 @views_bp.route('/start_ocr/<file_id>', methods=['POST'])
 async def start_ocr(request, file_id):
     ocr_option = request.json.get('ocr_option', 'basic')  # Default to 'basic' if not provided
-    
+
     with session_scope() as session:
         file_entry = session.query(File).filter_by(id=file_id).first()
         if not file_entry:
             return response.json({'error': 'File not found'}, status=404)
+
+        # Prevent duplicate OCR processing - check if already processing or completed
+        if file_entry.status == 'Processing':
+            return response.json({'error': 'OCR is already in progress for this file'}, status=409)
+
+        if file_entry.status in ('Processed', 'OCR Completed'):
+            return response.json({'error': 'OCR has already been completed for this file'}, status=409)
 
         file_entry.status = 'Processing'
         session.commit()
