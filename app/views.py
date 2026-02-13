@@ -285,16 +285,30 @@ async def get_projects(request, client_id):
 
 @views_bp.route('/get_projects_by_client_name/<client_name>', methods=['GET'])
 async def get_projects_by_client_name(request, client_name):
+    user_id = request.cookies.get('user_id')
+
     with session_scope() as session:
         # Normalize the client_name to handle underscores and spaces
         normalized_client_name = client_name.replace('_', ' ')  # Convert underscores back to spaces
-        
+
         # Use case-insensitive comparison with normalized client name
         client = session.query(Client).filter(func.lower(Client.name) == func.lower(normalized_client_name)).first()
 
         if client:
-            projects = session.query(Project).filter_by(client_id=client.id).all()
-            project_list = [{"id": project.id, "name": project.name} for project in projects]
+            # Get distinct project names for this client and user
+            query = session.query(Project).filter_by(client_id=client.id)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            projects = query.all()
+
+            # Return unique project names only
+            seen_names = set()
+            project_list = []
+            for project in projects:
+                if project.name not in seen_names:
+                    seen_names.add(project.name)
+                    project_list.append({"id": project.id, "name": project.name})
+
             return response.json(project_list)
 
         return response.json([])  # Return an empty list if no matching client found
