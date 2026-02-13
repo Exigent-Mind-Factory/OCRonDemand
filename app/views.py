@@ -389,14 +389,14 @@ async def download_file(request, file_id):
         if not file_entry:
             return response.json({'error': 'File not found'}, status=404)
 
-        # Construct the OCR'ed filename
-        original_filename = file_entry.file_name
-        base_name, ext = os.path.splitext(original_filename)
-        ocr_filename = f"{base_name}_OCRed_with_bookmarks{ext}"
-        file_path = os.path.join(os.path.dirname(file_entry.file_path), ocr_filename)
+        # Use the output_path from the database (set by merge_ocr_batches)
+        file_path = file_entry.output_path
 
-        if not os.path.exists(file_path):
+        if not file_path or not os.path.exists(file_path):
             return response.json({'error': 'OCRed file not found on server'}, status=404)
+
+        # Get the filename for download
+        ocr_filename = os.path.basename(file_path)
 
         # Get file statistics for the Content-Length header
         file_stat = await async_os.stat(file_path)
@@ -409,7 +409,7 @@ async def download_file(request, file_id):
         # Stream the file to the user
         return await response.file_stream(
             file_path,
-            chunk_size=8192,  # You can adjust the chunk size if needed
+            chunk_size=8192,
             headers=headers,
         )
 
