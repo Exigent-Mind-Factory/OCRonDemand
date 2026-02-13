@@ -135,16 +135,12 @@ class PDFManipulator:
                 subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             elif ocr_option.lower() == "advanced":
-                # Advanced OCR using Tesseract via ImageMagick and PyPDF2
+                # Advanced OCR using ImageMagick for preprocessing + ocrmypdf for OCR
+                # This approach: preprocesses images at 300 DPI for quality, then compresses output
 
-                # Step 1: Convert PDF to images
-                output_image_pattern = self.input_pdf_path.replace('.pdf', '_page_%d.png')
-                #cmd_convert = [
-                #    'magick',  
-                #    '-density', '300',  # High DPI for better OCR accuracy
-                #    self.input_pdf_path,
-                #    output_image_pattern
-                #]
+                # Step 1: Convert PDF pages to high-quality images for better OCR
+                tmp_dir = os.path.dirname(self.outcome_pdf_path)
+                output_image_pattern = os.path.join(tmp_dir, 'page_%04d.png')
 
                 cmd_convert = [
                     'magick',
@@ -153,36 +149,51 @@ class PDFManipulator:
                     '-limit', 'memory', '2GiB',
                     '-density', '300',
                     self.outcome_pdf_path,
-                    self.outcome_pdf_path
+                    '-depth', '8',
+                    '-strip',
+                    output_image_pattern
                 ]
 
                 print(f"Running ImageMagick command: {' '.join(cmd_convert)}")
-                # subprocess.run(cmd_convert, check=True)
                 subprocess.run(cmd_convert, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-
-                # Step 2: Apply OCR to images
-                ocr_output_files = []
-                for image_file in sorted(glob.glob(output_image_pattern.replace('%d', '*'))):
-                    ocr_output_pdf = image_file.replace('.png', '.pdf')
-                    cmd_ocr = [
-                        'tesseract',
-                        image_file,
-                        ocr_output_pdf.replace('.pdf', ''),  # Output file name without extension
-                        '--oem', '1',  # Use the LSTM OCR Engine
-                        '--psm', '3',  # Page segmentation mode
-                        'pdf'
+                # Step 2: Convert images back to a single PDF (compressed)
+                image_files = sorted(glob.glob(os.path.join(tmp_dir, 'page_*.png')))
+                if image_files:
+                    preprocessed_pdf = os.path.join(tmp_dir, 'preprocessed.pdf')
+                    cmd_img_to_pdf = [
+                        'magick',
+                        *image_files,
+                        '-compress', 'JPEG',
+                        '-quality', '85',
+                        preprocessed_pdf
                     ]
-                    print(f"Running Tesseract OCR on: {image_file}")
-                    
-                    # subprocess.run(cmd_ocr, check=True)
-                    subprocess.run(cmd_convert, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    print(f"Converting images to compressed PDF: {' '.join(cmd_img_to_pdf[:5])}...")
+                    subprocess.run(cmd_img_to_pdf, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                    ocr_output_files.append(ocr_output_pdf)
+                    # Step 3: Apply OCR using ocrmypdf with optimization
+                    cmd_ocr = [
+                        'ocrmypdf',
+                        '--optimize', '2',  # Aggressive optimization (lossless)
+                        '--force-ocr',
+                        '--rotate-pages',
+                        '--deskew',
+                        '--clean',
+                        '--pdfa-image-compression', 'jpeg',
+                        preprocessed_pdf,
+                        self.outcome_pdf_path
+                    ]
+                    print(f"Running ocrmypdf command: {' '.join(cmd_ocr)}")
+                    subprocess.run(cmd_ocr, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                # Step 3: Merge OCR'ed PDFs into a single output PDF
-                if ocr_output_files:
-                    self.merge_ocr_pdfs(ocr_output_files)
+                    # Step 4: Cleanup temporary files
+                    for img_file in image_files:
+                        if os.path.exists(img_file):
+                            os.remove(img_file)
+                    if os.path.exists(preprocessed_pdf):
+                        os.remove(preprocessed_pdf)
+                else:
+                    raise Exception("No images generated from PDF conversion")
 
             else:
                 raise ValueError("Invalid OCR option provided.")
