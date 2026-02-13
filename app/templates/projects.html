@@ -219,15 +219,6 @@
 
 
 
-    function attachButtonListeners() {
-        document.querySelectorAll('button[data-file-id]').forEach(button => {
-            button.addEventListener('click', function () {
-                startOcrProcess(this.getAttribute('data-file-id'));
-            });
-        });
-    }
-
-
     // Pagination function
     function paginateTable() {
         const start = (currentPage - 1) * itemsPerPage;
@@ -237,7 +228,6 @@
         projectsList.innerHTML = '';
         paginatedItems.forEach(row => projectsList.appendChild(row));
         updatePaginationControls();
-        attachButtonListeners();  // Reattach event listeners after pagination
     }
 
     function updatePaginationControls() {
@@ -377,7 +367,7 @@
                                     <option value="advanced">Advanced OCR</option>
                                 </select>
                             </div>
-                            <button class="btn btn-warning btn-sm" data-file-id="${file.id}" onclick="startOcrProcess(${file.id})">Start OCR</button>` : ''}
+                            <button class="btn btn-warning btn-sm" onclick="startOcrProcess(${file.id})">Start OCR</button>` : ''}
     
                         ${file.status === 'Processing' || file.conversion_status === 'Processing' ? `
                             <div class="progress mt-3" style="height: 20px;">
@@ -391,9 +381,8 @@
                 allRows.push(row);
             });
         });
-    
+
         paginateTable();
-        attachButtonListeners();  // Attach button listeners for newly loaded rows
     }
 
     // Polling for status updates every 10 seconds

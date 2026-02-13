@@ -115,8 +115,9 @@ class PDFManipulator:
 
     def apply_ocr(self, ocr_option="basic"):
         try:
-            self.update_status('Processing')  # Set status to processing
-            
+            # Note: Status is set to 'Processing' by the /start_ocr endpoint before task dispatch
+            # and to 'OCR Completed' by merge_ocr_batches after all batches are merged
+
             # Ensure that the signature is removed first
             self.remove_signature()
 
@@ -199,24 +200,19 @@ class PDFManipulator:
                 raise ValueError("Invalid OCR option provided.")
 
             print(f"OCR applied successfully using {ocr_option}. Output saved to {self.outcome_pdf_path}")
-            
-            # Once all processing is done, update the file status
-            self.update_status('Processed')  # Mark as processed
 
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e.cmd}")
             print(f"Return code: {e.returncode}")
-            # print(f"Error output: {e.stderr.decode()}")
-            # print(f"Standard output: {e.stdout.decode()}")
             err = (e.stderr.decode(errors="replace") if e.stderr else "")
             out = (e.stdout.decode(errors="replace") if e.stdout else "")
             print(f"Error output: {err}")
             print(f"Standard output: {out}")
+            raise  # Re-raise to be handled by the task
 
-            self.update_status('Failed')
-            
         except Exception as e:
             print(f"Error processing {self.input_pdf_path} with {ocr_option} OCR: {e}")
+            raise  # Re-raise to be handled by the task
         finally:
             gc.collect()
 

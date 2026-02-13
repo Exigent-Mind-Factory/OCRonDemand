@@ -309,12 +309,9 @@ async def start_ocr(request, file_id):
         if not file_entry:
             return response.json({'error': 'File not found'}, status=404)
 
-        # Prevent duplicate OCR processing - check if already processing or completed
+        # Prevent concurrent OCR processing on the same file
         if file_entry.status == 'Processing':
             return response.json({'error': 'OCR is already in progress for this file'}, status=409)
-
-        if file_entry.status in ('Processed', 'OCR Completed'):
-            return response.json({'error': 'OCR has already been completed for this file'}, status=409)
 
         file_entry.status = 'Processing'
         session.commit()

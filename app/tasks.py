@@ -82,10 +82,24 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
             return
 
         try:
+            # Check for any failed batches
+            errors = [res for res in results if 'error' in res]
+            if errors:
+                print(f"Some batches failed: {errors}")
+                file_entry.status = 'Failed'
+                session.commit()
+                return {"error": "Some batches failed", "details": errors}
+
             # Step 6: Sort the results by 'start_page'
             sorted_results = sorted(results, key=lambda x: x['start_page'])
             output_dir = os.path.dirname(file_entry.file_path)
             ocr_files = [res['ocr_file'] for res in sorted_results if 'ocr_file' in res]
+
+            if not ocr_files:
+                print("No OCR files to merge")
+                file_entry.status = 'Failed'
+                session.commit()
+                return {"error": "No OCR files to merge"}
 
             # Step 7: Merge the OCR'ed PDF files into one final PDF
             final_pdf_path = merge_pdf(ocr_files, output_dir, file_entry.file_name)
@@ -104,26 +118,29 @@ def merge_ocr_batches(results, file_id, bookmarks_list):
             pdf_document.close()
                 
             # Step 10: Reattach the bookmarks to the final PDF
-            reattach_bookmarks_from_dataframe(final_renamed_pdf_path, bookmarks_df, 1, total_pages)  #len(sorted_results))
-            
-            # Step 11: Update file entry status
-            # file_entry.output_path = final_renamed_pdf_path
-            # file_entry.status = 'Processed'
-            # file_entry.completed_at = datetime.utcnow()
-            # session.commit()
+            reattach_bookmarks_from_dataframe(final_renamed_pdf_path, bookmarks_df, 1, total_pages)
+
+            # Step 11: Update file entry status to OCR Completed
+            file_entry.output_path = final_renamed_pdf_path
+            file_entry.status = 'OCR Completed'
+            file_entry.completed_at = datetime.utcnow()
+            session.commit()
 
             # Cleanup temporary directory
-            # tmp_dir = os.path.join(output_dir, 'tmp')
-            # cleanup_tmp_dir(tmp_dir)
+            tmp_dir = os.path.join(output_dir, 'tmp')
+            cleanup_tmp_dir(tmp_dir)
 
             # Trigger DOCX conversion after OCR completion
             process_pdf_to_docx.delay(final_renamed_pdf_path, file_id)
 
-
         except KeyError as e:
             print(f"Error merging PDFs: missing key {e}")
+            file_entry.status = 'Failed'
+            session.commit()
         except Exception as e:
             print(f"General error during merging: {e}")
+            file_entry.status = 'Failed'
+            session.commit()
             
         gc.collect()
 
