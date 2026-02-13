@@ -355,7 +355,7 @@
                     <td>${new Date(file.created_at).toLocaleString()}</td>
                     <td id="status-${file.id}">${file.status}</td>
                     <td id="action-${file.id}">
-                        ${file.status === 'Processed' ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download PDF</a>` : ''}
+                        ${(file.status === 'Processed' || file.status === 'OCR Completed') ? `<a href="${file.download_url}" class="btn btn-success btn-sm">Download PDF</a>` : ''}
                 ${file.conversion_status === 'Completed' ? `<a href="${file.docx_download_url}" class="btn btn-primary btn-sm">Download DOCX</a>` : ''}
                         ${file.raw_docx_url ? `<a href="${file.raw_docx_url}" class="btn btn-warning btn-sm">Download RAW DOCX</a>` : ''}
     
